@@ -5,13 +5,21 @@ public class Player {
 }
 
 class Game {
+
+	final static int PRODUCTION_0 = 0;
+	final static int PRODUCTION_1 = 1;
+	final static int PRODUCTION_2 = 2;
+	final static int PRODUCTION_3 = 3;
 	
 	Factory[] factories;
 	Troop[] troops;
 	Builder builder = new Builder();
 	
-	public Game (int nbFactories, int nbTroops) {
+	public Game (int nbFactories) {
 		this.factories = new Factory[nbFactories];
+	}
+	
+	public void initNbTroop(int nbTroops) {
 		this.troops = new Troop[nbTroops];
 	}
 	
@@ -52,13 +60,19 @@ class Game {
 			Troop troop = this.troops[id];
 			if (troop.getRemainingTurns() == 0) {
 				Factory factory = this.factories[troop.getTo()];
-				if (troop.getOwner().equals(factory.getOwner())) {
-					factory.addCyborgs(troop.getNbCyborgs());
+				if (troop.getOwner().equals(Owner.PLAYER)) {
+					factory.addPlayerNbCyborgs(troop.getNbCyborgs());
 				}
-				else {
-					factory.removeCyborgs(troop.getNbCyborgs());
+				else if (troop.getOwner().equals(Owner.OPPONENT)){
+					factory.addOpponentNbCyborgs(troop.getNbCyborgs());
 				}
 			}
+		}
+		
+		// Ownership management
+		for (int id = 0; id < factories.length; id++) {
+			Factory factory = this.factories[id];
+			factory.resolveBattle();
 		}
 
 	}
@@ -130,6 +144,8 @@ class Factory {
 	Owner owner;
 	int production;
 	int nbCyborgs;
+	int playerNbCyborgs;
+	int opponentNbCyborgs;
 
 	public Factory(int id) {
 		this.id = id;
@@ -174,6 +190,63 @@ class Factory {
 	public void removeCyborgs(int nbCyborgs) {
 		this.nbCyborgs -= nbCyborgs;
 	}
+	
+	public void setPositiveNbCyborgs() {
+		this.nbCyborgs = Math.abs(this.nbCyborgs);
+	}
+	
+	public int getPlayerNbCyborgs() {
+		return this.playerNbCyborgs;
+	}
+	
+	public int getOpponentNbCyborgs() {
+		return this.opponentNbCyborgs;
+	}
+	
+	public void addPlayerNbCyborgs(int playerNbCyborg) {
+		this.playerNbCyborgs += playerNbCyborg;
+	}
+	
+	public void addOpponentNbCyborgs(int opponentNbCyborgs) {
+		this.opponentNbCyborgs += opponentNbCyborgs;
+	}
+	
+	public void solveOwnership(Owner owner) {
+		if (this.nbCyborgs < 0) {
+			this.owner = owner;
+			setPositiveNbCyborgs();
+		}
+	}
+	
+	public void resolveBattle() {
+		if (this.playerNbCyborgs == this.opponentNbCyborgs) {
+			// Do Nothing
+		}
+		else if (this.playerNbCyborgs > this.opponentNbCyborgs) {
+			int finalPlayerNbCyborgs = this.playerNbCyborgs - this.opponentNbCyborgs;
+			if (this.owner == Owner.PLAYER) {
+				addCyborgs(finalPlayerNbCyborgs);
+			}
+			else {
+				removeCyborgs(finalPlayerNbCyborgs);
+				solveOwnership(Owner.PLAYER);
+			}
+		}
+		else if (this.opponentNbCyborgs > this.playerNbCyborgs) {
+			int finalOpponentNbCyborgs = this.opponentNbCyborgs - this.playerNbCyborgs;
+			if (this.owner == Owner.OPPONENT) {
+				addCyborgs(finalOpponentNbCyborgs);
+			}
+			else {
+				removeCyborgs(finalOpponentNbCyborgs);
+				solveOwnership(Owner.OPPONENT);
+			}
+		}
+		this.playerNbCyborgs = 0;
+		this.opponentNbCyborgs = 0;
+		return;
+	}
+
 }
 
 class Builder {
