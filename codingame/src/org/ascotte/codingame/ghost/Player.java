@@ -12,36 +12,71 @@ class Game {
 	final static int PRODUCTION_3 = 3;
 	final static int INCREMENT_CYBORGS_COST = 10;
 	final static int MAX_PRODUCTION = 3;
+	final static int MAX_TROOPS = 400;
+	final static int MAX_ACTIONS = 100;
 	
 	Factory[] factories;
 	Troop[] troops;
 	Action[] actions;
+	int[][] distances;
+	
+	int nbActions = 0;
+	int nbTroops = 0;
 	Builder builder = new Builder();
 	
 	public Game (int nbFactories) {
 		this.factories = new Factory[nbFactories];
-		this.troops = new Troop[0];
-		this.actions = new Action[0];
+		this.troops = new Troop[MAX_TROOPS];
+		this.actions = new Action[MAX_ACTIONS];
+		this.distances = new int[nbFactories][nbFactories];
 	}
 	
-	public void initNbTroop(int nbTroops) {
-		this.troops = new Troop[nbTroops];
+	public void initDistance(int fixed) {
+		for (int i = 0; i < this.factories.length; i++) {
+			for (int j = 0; j < this.factories.length; j++) {
+				if (i == j) {
+					this.distances[i][j] = 0;
+				}
+				else {
+					this.distances[i][j] = fixed;
+				}
+			}
+		}
 	}
 	
-	public void initNbAction(int nbActions) {
+	public int getDistance(int from, int to) {
+		return this.distances[from][to];
+	}
+	
+	public void addTroop() {
+		this.nbTroops++;
+	}
+	
+	public void addAction() {
+		this.nbActions++;
+	}
+	
+	public void addAction(int nbActions) {
 		this.actions = new Action[nbActions];
 	}
 	
-	public void addActionIncrement(int id, int from, Owner owner) {
-		this.actions[id] = builder.createActionIncrement(owner, from);
+	public void addActionIncrement(int from, Owner owner) {
+		this.actions[this.nbActions] = builder.createActionIncrement(owner, from);
+		addAction();
+	}
+	
+	public void addActionMove(int from, int to, int nbCyborgs, Owner owner) {
+		this.actions[this.nbActions] = builder.createActionMove(owner, from, to, nbCyborgs);
+		addAction();
 	}
 	
 	public void addFactory(int id, Owner owner, int production, int nbCyborgs) {
 		this.factories[id] = builder.createFactory(id, owner, production, nbCyborgs);
 	}
 	
-	public void addTroop(int id, Owner owner, int from, int to, int nbCyborgs, int remainingTurns) {
-		this.troops[id] = builder.createTroop(id, owner, from, to, nbCyborgs, remainingTurns);
+	public void addTroop(Owner owner, int from, int to, int nbCyborgs, int remainingTurns) {
+		this.troops[this.nbTroops] = builder.createTroop(owner, from, to, nbCyborgs, remainingTurns);
+		addTroop();
 	}
 	
 	public Factory getFactory(int id) {
@@ -52,24 +87,24 @@ class Game {
 		return troops[id];
 	}
 	
+	public int getNbActions() {
+		return this.nbActions;
+	}
+	
+	public int getNbTroops() {
+		return this.nbTroops;
+	}
+	
 	public void play(){
 		
 		// Move management
-		for (int id = 0; id < troops.length; id++) {
+		for (int id = 0; id < this.nbTroops; id++) {
 			Troop troop = this.troops[id];
 			troop.move();
 		}
 		
-		// Production management
-		for (int id = 0; id < factories.length; id++) {
-			Factory factory = this.factories[id];
-			if (factory.getOwner() != Owner.NOBODY) {
-				factory.addProductionToNbCyborgs();
-			}
-		}
-		
 		// Action management
-		for (int id = 0; id < actions.length; id++) {
+		for (int id = 0; id < this.nbActions; id++) {
 			Action action = this.actions[id];
 			// Increment management
 			switch (action.action) {
@@ -82,13 +117,31 @@ class Game {
 						}
 					}
 				break;
+				case MOVE:
+					Factory fromFactory = this.factories[action.getFrom()];
+					Factory toFactory = this.factories[action.getTo()];
+					if (fromFactory.getOwner() == action.getOwner() && fromFactory.getId()!=toFactory.getId()) {
+						int nbCyborgsSent = Math.min(fromFactory.getNbCyborgs(), action.getNbCyborgs());
+						int remainingTurn = getDistance(fromFactory.getId(), toFactory.getId());
+						this.addTroop(action.getOwner(), fromFactory.getId(), toFactory.getId(), nbCyborgsSent, remainingTurn);
+						fromFactory.removeCyborgs(nbCyborgsSent);
+					}
 				default:
 				break;
 			}
 		}
+		this.nbActions = 0;
+		
+		// Production management
+		for (int id = 0; id < factories.length; id++) {
+			Factory factory = this.factories[id];
+			if (factory.getOwner() != Owner.NOBODY) {
+				factory.addProductionToNbCyborgs();
+			}
+		}
 		
 		// Battle management
-		for (int id = 0; id < troops.length; id++) {
+		for (int id = 0; id < this.nbTroops; id++) {
 			Troop troop = this.troops[id];
 			if (troop.getRemainingTurns() == 0) {
 				Factory factory = this.factories[troop.getTo()];
@@ -156,19 +209,13 @@ class Action {
 }
 	
 class Troop {
-	int id;
 	Owner owner;
 	int from;
 	int to;
 	int nbCyborgs;
 	int remainingTurns;
 	
-	public Troop(int id) {
-		this.id = id;
-	}
-	
-	public int getId() {
-		return this.id;
+	public Troop() {
 	}
 	
 	public Owner getOwner() {
@@ -340,8 +387,8 @@ class Builder {
 		return factory;
 	}
 	
-	public Troop createTroop(int id, Owner owner, int from, int to, int nbCyborgs, int remainingTurns) {
-		Troop troop = new Troop(id);
+	public Troop createTroop(Owner owner, int from, int to, int nbCyborgs, int remainingTurns) {
+		Troop troop = new Troop();
 		troop.setOwner(owner);
 		troop.setFrom(from);
 		troop.setTo(to);

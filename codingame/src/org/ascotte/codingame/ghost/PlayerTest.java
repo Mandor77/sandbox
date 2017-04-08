@@ -16,6 +16,7 @@ public class PlayerTest {
 	final static int NB_CYBORGS_2 = 2;
 	final static int NB_CYBORGS_5 = 5;
 	final static int NB_CYBORGS_12 = 12;
+	final static int FIXED_DISTANCE = 2;
 	
 	public Game createStandardGame() {
 		Game game = new Game(NB_FACTORY);
@@ -26,6 +27,7 @@ public class PlayerTest {
 		game.addFactory(FACTORY_OPPONENT_NO_PRODUCTION, Owner.OPPONENT, Game.PRODUCTION_0, NB_CYBORGS_2);
 		game.addFactory(FACTORY_OPPONENT_PRODUCTION_2, Owner.OPPONENT, Game.PRODUCTION_2, NB_CYBORGS_2);
 		game.addFactory(FACTORY_OPPONENT_PRODUCTION_3, Owner.OPPONENT, Game.PRODUCTION_3, NB_CYBORGS_5);
+		game.initDistance(FIXED_DISTANCE);
 		return game;
 	}
 	
@@ -65,8 +67,7 @@ public class PlayerTest {
 	@Test
 	public void troopMoveOfOneByTurn() {
 		Game game = createStandardGame();
-		game.initNbTroop(1);
-		game.addTroop(0, Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 1, 5);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 1, 5);
 		
 		game.play();
 		
@@ -76,8 +77,7 @@ public class PlayerTest {
 	@Test
 	public void troopAttackAnEnnemyFactory() {
 		Game game = createStandardGame();
-		game.initNbTroop(1);
-		game.addTroop(0, Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
 		Factory factory = game.getFactory(FACTORY_OPPONENT_NO_PRODUCTION);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -89,8 +89,7 @@ public class PlayerTest {
 	@Test
 	public void troopReinforceAmicalFactory() {
 		Game game = createStandardGame();
-		game.initNbTroop(1);
-		game.addTroop(0, Owner.OPPONENT, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
+		game.addTroop(Owner.OPPONENT, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
 		Factory factory = game.getFactory(FACTORY_OPPONENT_NO_PRODUCTION);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -102,8 +101,7 @@ public class PlayerTest {
 	@Test
 	public void troopWinAnEnnemyFactory() {
 		Game game = createStandardGame();
-		game.initNbTroop(1);
-		game.addTroop(0, Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 5, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 5, 1);
 		Factory factory = game.getFactory(FACTORY_OPPONENT_NO_PRODUCTION);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -116,8 +114,7 @@ public class PlayerTest {
 	@Test
 	public void troopWinANotOwnedFactory() {
 		Game game = createStandardGame();
-		game.initNbTroop(1);
-		game.addTroop(0, Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_NEUTRAL_PRODUCTION_2, 6, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_NEUTRAL_PRODUCTION_2, 6, 1);
 		Factory factory = game.getFactory(FACTORY_NEUTRAL_PRODUCTION_2);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -131,9 +128,8 @@ public class PlayerTest {
 	@Test
 	public void troopAttackInPriorityOtherTroops() {
 		Game game = createStandardGame();
-		game.initNbTroop(2);
-		game.addTroop(0, Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
-		game.addTroop(1, Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
+		game.addTroop(Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
 		Factory factory = game.getFactory(FACTORY_OPPONENT_NO_PRODUCTION);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -147,11 +143,10 @@ public class PlayerTest {
 	@Test
 	public void troopAttackBothEnnemyTroopsAndEnnemyFactoryWithoutConquest() {
 		Game game = createStandardGame();
-		game.initNbTroop(4);
-		game.addTroop(0, Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 5, 1);
-		game.addTroop(1, Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_3, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
-		game.addTroop(2, Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 4, 1);
-		game.addTroop(3, Owner.PLAYER, FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 3, 1);
+		game.addTroop(Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 5, 1);
+		game.addTroop(Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_3, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 4, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 3, 1);
 		Factory factory = game.getFactory(FACTORY_OPPONENT_NO_PRODUCTION);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -164,11 +159,10 @@ public class PlayerTest {
 	@Test
 	public void troopAttackBothEnnemyTroopsAndEnnemyFactoryWithConquest() {
 		Game game = createStandardGame();
-		game.initNbTroop(4);
-		game.addTroop(0, Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 5, 1);
-		game.addTroop(1, Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_3, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
-		game.addTroop(2, Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 8, 1);
-		game.addTroop(3, Owner.PLAYER, FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 3, 1);
+		game.addTroop(Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 5, 1);
+		game.addTroop(Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_3, FACTORY_OPPONENT_NO_PRODUCTION, 1, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_NO_PRODUCTION, 8, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_NO_PRODUCTION, 3, 1);
 		Factory factory = game.getFactory(FACTORY_OPPONENT_NO_PRODUCTION);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -181,11 +175,10 @@ public class PlayerTest {
 	@Test
 	public void troopAttackBothEnnemyTroopsAndNotOwnedFactoryWithConquest() {
 		Game game = createStandardGame();
-		game.initNbTroop(4);
-		game.addTroop(0, Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_2, FACTORY_NEUTRAL_PRODUCTION_2, 5, 1);
-		game.addTroop(1, Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_3, FACTORY_NEUTRAL_PRODUCTION_2, 1, 1);
-		game.addTroop(2, Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_NEUTRAL_PRODUCTION_2, 12, 1);
-		game.addTroop(3, Owner.PLAYER, FACTORY_PLAYER_PRODUCTION_2, FACTORY_NEUTRAL_PRODUCTION_2, 3, 1);
+		game.addTroop(Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_2, FACTORY_NEUTRAL_PRODUCTION_2, 5, 1);
+		game.addTroop(Owner.OPPONENT, FACTORY_OPPONENT_PRODUCTION_3, FACTORY_NEUTRAL_PRODUCTION_2, 1, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_NO_PRODUCTION, FACTORY_NEUTRAL_PRODUCTION_2, 12, 1);
+		game.addTroop(Owner.PLAYER, FACTORY_PLAYER_PRODUCTION_2, FACTORY_NEUTRAL_PRODUCTION_2, 3, 1);
 		Factory factory = game.getFactory(FACTORY_NEUTRAL_PRODUCTION_2);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -198,8 +191,7 @@ public class PlayerTest {
 	@Test
 	public void incrementWorkOnlyIfMoreThanTenCyborgs() {
 		Game game = createStandardGame();
-		game.initNbAction(1);
-		game.addActionIncrement(0, FACTORY_PLAYER_PRODUCTION_2, Owner.PLAYER);
+		game.addActionIncrement(FACTORY_PLAYER_PRODUCTION_2, Owner.PLAYER);
 		Factory factory = game.getFactory(FACTORY_PLAYER_PRODUCTION_2);
 		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_2;
 		int initialProduction = factory.getProduction();
@@ -213,8 +205,7 @@ public class PlayerTest {
 	@Test
 	public void incrementWorkOnlyIfLessThanMaxProduction() {
 		Game game = createStandardGame();
-		game.initNbAction(1);
-		game.addActionIncrement(0, FACTORY_PLAYER_PRODUCTION_3, Owner.PLAYER);
+		game.addActionIncrement(FACTORY_PLAYER_PRODUCTION_3, Owner.PLAYER);
 		Factory factory = game.getFactory(FACTORY_PLAYER_PRODUCTION_3);
 		factory.setNbCyborgs(15);
 		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_3;
@@ -229,8 +220,7 @@ public class PlayerTest {
 	@Test
 	public void incrementWorkOnlyIfOwnerIsSameThanAction() {
 		Game game = createStandardGame();
-		game.initNbAction(1);
-		game.addActionIncrement(0, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		game.addActionIncrement(FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
 		Factory factory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
 		factory.setNbCyborgs(15);
 		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_2;
@@ -245,16 +235,107 @@ public class PlayerTest {
 	@Test
 	public void incrementRemoveTenCyborgsAndAddOneProduction () {
 		Game game = createStandardGame();
-		game.initNbAction(1);
-		game.addActionIncrement(0, FACTORY_PLAYER_PRODUCTION_2, Owner.PLAYER);
+		game.addActionIncrement(FACTORY_PLAYER_PRODUCTION_2, Owner.PLAYER);
 		Factory factory = game.getFactory(FACTORY_PLAYER_PRODUCTION_2);
 		factory.setNbCyborgs(15);
-		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_2;
+		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_3;
 		int initialProduction = factory.getProduction();
 		
 		game.play();
 		
 		Assert.assertEquals("Initial number of cyborgs was not modified", initialNbCyborgs - Game.INCREMENT_CYBORGS_COST, factory.getNbCyborgs());
 		Assert.assertEquals("Initial production was not modified", initialProduction + 1, factory.getProduction());
+	}
+	
+	@Test
+	public void moveCreateATroop () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troop was not created", 1, game.getNbTroops());
+	}
+	
+	@Test
+	public void severalMoveCreateSeveralTroops () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.PLAYER);
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_3, FACTORY_OPPONENT_PRODUCTION_2, 3, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troops was not created", 2, game.getNbTroops());
+	}
+	
+	@Test
+	public void moveCreateATroopOnlyIfOwnerIsSameThanFromFactory () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.OPPONENT);
+		
+		game.play();
+		
+		Assert.assertEquals("Troop was created", 0, game.getNbTroops());
+	}
+	
+	@Test
+	public void moveCannotUseMoreThanFactoryNbCyborgs () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
+		Factory fromFactory = game.getFactory(FACTORY_PLAYER_PRODUCTION_2);
+		int fromFactoryNbCyborgs = fromFactory.getNbCyborgs();
+		
+		game.play();
+		
+		Assert.assertEquals("Cyborg number can not be higher than cyborg number in the from factory", fromFactoryNbCyborgs, game.getTroop(0).getNbCyborgs());
+	}
+	
+	@Test
+	public void moveRemoveCyborgsFromFactory () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
+		int initialNumberOfCyborg = factory.getNbCyborgs();
+		
+		game.play();
+		
+		Assert.assertEquals("From factory don't have the correct number of cyborg", Math.max(0, initialNumberOfCyborg - 1), factory.getNbCyborgs());
+	}
+	
+	@Test
+	public void moveRemoveMaximumCyborgsFromFactory() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
+		int initialNumberOfCyborg = factory.getNbCyborgs();
+		
+		game.play();
+		
+		Assert.assertEquals("From factory don't have the correct number of cyborg", Math.max(0, initialNumberOfCyborg - 2), factory.getNbCyborgs());
+	}
+	
+	@Test
+	public void moveCantBeDoneOnSameFactory() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_PLAYER_PRODUCTION_2, 2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troop was created", 0, game.getNbTroops());
+	}
+	
+	
+	@Test
+	public void moveUseCorrectDistanceToSetRemainingTurn() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
+		Factory fromFactory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
+		Factory toFactory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		int distance = game.getDistance(fromFactory.getId(), toFactory.getId());
+		
+		game.play();
+		
+		Assert.assertEquals("Remaining turn number is not correct", distance, game.getTroop(0).getRemainingTurns());
+	
 	}
 }
