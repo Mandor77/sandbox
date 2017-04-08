@@ -14,14 +14,19 @@ class Game {
 	final static int MAX_PRODUCTION = 3;
 	final static int MAX_TROOPS = 400;
 	final static int MAX_ACTIONS = 100;
+	final static int MAX_NB_BOMBS_PER_OWNER = 2;
+	static int NB_PLAYER_BOMBS = 0;
+	static int NB_OPPONENT_BOMBS = 0;
 	
 	Factory[] factories;
 	Troop[] troops;
 	Action[] actions;
+	Bomb[] bombs;
 	int[][] distances;
 	
 	int nbActions = 0;
 	int nbTroops = 0;
+	int nbBombs = 0;
 	Builder builder = new Builder();
 	
 	public Game (int nbFactories) {
@@ -29,6 +34,7 @@ class Game {
 		this.troops = new Troop[MAX_TROOPS];
 		this.actions = new Action[MAX_ACTIONS];
 		this.distances = new int[nbFactories][nbFactories];
+		this.bombs = new Bomb[MAX_NB_BOMBS_PER_OWNER * 2];
 	}
 	
 	public void initDistance(int fixed) {
@@ -56,6 +62,10 @@ class Game {
 		this.nbActions++;
 	}
 	
+	public void addBomb() {
+		this.nbBombs++;
+	}
+	
 	public void addAction(int nbActions) {
 		this.actions = new Action[nbActions];
 	}
@@ -70,6 +80,10 @@ class Game {
 		addAction();
 	}
 	
+	public void addActionBomb(int from, int to, Owner owner){
+		this.actions[this.nbActions] = builder.createActionBomb(owner, from, to);
+		addAction();
+	}
 	public void addFactory(int id, Owner owner, int production, int nbCyborgs) {
 		this.factories[id] = builder.createFactory(id, owner, production, nbCyborgs);
 	}
@@ -77,6 +91,13 @@ class Game {
 	public void addTroop(Owner owner, int from, int to, int nbCyborgs, int remainingTurns) {
 		this.troops[this.nbTroops] = builder.createTroop(owner, from, to, nbCyborgs, remainingTurns);
 		addTroop();
+	}
+	
+	public void addBomb(Owner owner, int from, int to, int remainingTurns) {
+		this.bombs[this.nbBombs] = builder.createBomb(owner, from, to, remainingTurns);
+		if (owner.equals(Owner.PLAYER)) { NB_PLAYER_BOMBS++; }
+		else if (owner.equals(Owner.OPPONENT)) { NB_OPPONENT_BOMBS++; }
+		addBomb();
 	}
 	
 	public Factory getFactory(int id) {
@@ -87,12 +108,20 @@ class Game {
 		return troops[id];
 	}
 	
+	public Bomb getBombs(int id) {
+		return bombs[id];
+	}
+	
 	public int getNbActions() {
 		return this.nbActions;
 	}
 	
 	public int getNbTroops() {
 		return this.nbTroops;
+	}
+	
+	public int getNbBombs() {
+		return this.nbBombs;
 	}
 	
 	public void play(){
@@ -106,26 +135,35 @@ class Game {
 		// Action management
 		for (int id = 0; id < this.nbActions; id++) {
 			Action action = this.actions[id];
+			Factory fromFactory = this.factories[action.getFrom()];
+			Factory toFactory = this.factories[action.getTo()];
 			// Increment management
 			switch (action.action) {
 				case INCREMENT:
-					Factory factory = this.factories[action.getFrom()];
-					if (factory.getOwner() == action.getOwner()) {
-						if (factory.getNbCyborgs() >= INCREMENT_CYBORGS_COST && factory.getProduction() < MAX_PRODUCTION) {
-							factory.removeCyborgs(INCREMENT_CYBORGS_COST);
-							factory.increaseProduction();
+					if (fromFactory.getOwner() == action.getOwner()) {
+						if (fromFactory.getNbCyborgs() >= INCREMENT_CYBORGS_COST && fromFactory.getProduction() < MAX_PRODUCTION) {
+							fromFactory.removeCyborgs(INCREMENT_CYBORGS_COST);
+							fromFactory.increaseProduction();
+						}
+					}
+				break;
+				case BOMB:
+					if (fromFactory.getOwner() == action.getOwner() && fromFactory.getId()!=toFactory.getId()) {
+						if (action.getOwner().equals(Owner.PLAYER) && NB_PLAYER_BOMBS < MAX_NB_BOMBS_PER_OWNER ||
+								action.getOwner().equals(Owner.OPPONENT) && NB_OPPONENT_BOMBS < MAX_NB_BOMBS_PER_OWNER) {
+							int remainingTurns = getDistance(fromFactory.getId(), toFactory.getId());
+							this.addBomb(action.getOwner(), fromFactory.getId(), toFactory.getId(), remainingTurns);
 						}
 					}
 				break;
 				case MOVE:
-					Factory fromFactory = this.factories[action.getFrom()];
-					Factory toFactory = this.factories[action.getTo()];
 					if (fromFactory.getOwner() == action.getOwner() && fromFactory.getId()!=toFactory.getId()) {
 						int nbCyborgsSent = Math.min(fromFactory.getNbCyborgs(), action.getNbCyborgs());
-						int remainingTurn = getDistance(fromFactory.getId(), toFactory.getId());
-						this.addTroop(action.getOwner(), fromFactory.getId(), toFactory.getId(), nbCyborgsSent, remainingTurn);
+						int remainingTurns = getDistance(fromFactory.getId(), toFactory.getId());
+						this.addTroop(action.getOwner(), fromFactory.getId(), toFactory.getId(), nbCyborgsSent, remainingTurns);
 						fromFactory.removeCyborgs(nbCyborgsSent);
 					}
+				break;
 				default:
 				break;
 			}
@@ -163,6 +201,47 @@ class Game {
 	}
 }
 
+class Bomb {
+	Owner owner;
+	int from;
+	int to;
+	int remainingTurns;
+	
+	public Bomb() {
+		
+	}
+	
+	public void setOwner(Owner owner) {
+		this.owner = owner;
+	}
+	
+	public Owner getOwner() {
+		return this.owner;
+	}
+	
+	public void setRemainingTurns(int remainingTurns) {
+		this.remainingTurns = remainingTurns;
+	}
+	
+	public int getRemainingTurns() {
+		return this.remainingTurns;
+	}
+	
+	public void setFrom (int from) {
+		this.from = from;
+	}
+	public void setTo (int to) {
+		this.to = to;
+	}
+	
+	public int getFrom() {
+		return this.from;
+	}
+	
+	public int getTo() {
+		return this.to;
+	}
+}
 class Action {
 	Actions action;
 	Owner owner;
@@ -397,6 +476,15 @@ class Builder {
 		return troop;
 	}
 	
+	public Bomb createBomb(Owner owner, int from, int to, int remainingTurns) {
+		Bomb bomb = new Bomb();
+		bomb.setFrom(from);
+		bomb.setTo(to);
+		bomb.setOwner(owner);
+		bomb.setRemainingTurns(remainingTurns);
+		return bomb;
+	}
+	
 	public Action createActionMove(Owner owner, int from, int to, int nbCyborgs) {
 		Action action = new Action(Actions.MOVE, owner);
 		action.setFrom(from);
@@ -416,8 +504,10 @@ class Builder {
 		return action;
 	}
 	
-	public Action createActionBomb(Owner owner) {
+	public Action createActionBomb(Owner owner, int from, int to) {
 		Action action = new Action(Actions.BOMB, owner);
+		action.setFrom(from);
+		action.setTo(to);
 		return action;
 	}
 }

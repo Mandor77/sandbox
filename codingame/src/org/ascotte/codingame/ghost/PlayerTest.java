@@ -338,4 +338,37 @@ public class PlayerTest {
 		Assert.assertEquals("Remaining turn number is not correct", distance, game.getTroop(0).getRemainingTurns());
 	
 	}
+	
+	@Test
+	public void aTroopMoveAndWinAFactoryOnceArrived() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
+		factory.setNbCyborgs(25);
+		
+		game.play();
+		Assert.assertEquals("Target factory is captured too soon", Owner.OPPONENT, game.getFactory(FACTORY_OPPONENT_PRODUCTION_2).getOwner());
+	
+		game.play();
+		Assert.assertEquals("Target factory is captured too soon", Owner.OPPONENT, game.getFactory(FACTORY_OPPONENT_PRODUCTION_2).getOwner());
+		
+		game.play();
+		Assert.assertEquals("Target factory is not captured", Owner.PLAYER, game.getFactory(FACTORY_OPPONENT_PRODUCTION_2).getOwner());
+		
+	}
+	
+	@Test
+	public void notMoreThanTwoBombsCanBeCreated() {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_3, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Too many bombs", Game.MAX_NB_BOMBS_PER_OWNER, game.getNbBombs());
+	}
+	
+	// Do a factory send a bomb can not send a troop
+	
 }
