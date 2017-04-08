@@ -15,6 +15,7 @@ public class PlayerTest {
 	final static int NB_FACTORY = 7;
 	final static int NB_CYBORGS_2 = 2;
 	final static int NB_CYBORGS_5 = 5;
+	final static int NB_CYBORGS_12 = 12;
 	
 	public Game createStandardGame() {
 		Game game = new Game(NB_FACTORY);
@@ -31,7 +32,6 @@ public class PlayerTest {
 	@Test
 	public void productionIsDoneForOwnedFactoryWithProduction() {
 		Game game = createStandardGame();
-		game.initNbTroop(0);
 		
 		game.play();
 		
@@ -44,7 +44,6 @@ public class PlayerTest {
 	@Test
 	public void productionIsNotDoneForOwnedFactoryWithoutProduction() {
 		Game game = createStandardGame();
-		game.initNbTroop(0);
 		
 		game.play();
 		
@@ -55,7 +54,6 @@ public class PlayerTest {
 	@Test
 	public void productionIsNotDoneForNotOwnedFactory() {
 		Game game = createStandardGame();
-		game.initNbTroop(0);
 		Factory factory = game.getFactory(FACTORY_NEUTRAL_PRODUCTION_2);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
@@ -195,5 +193,68 @@ public class PlayerTest {
 		
 		Assert.assertEquals("Final cyborgs number is not correct", Math.abs(initialNbCyborgs - 9), factory.getNbCyborgs());
 		Assert.assertEquals("Ownership is not correctly changed", Owner.PLAYER, factory.getOwner());
+	}
+	
+	@Test
+	public void incrementWorkOnlyIfMoreThanTenCyborgs() {
+		Game game = createStandardGame();
+		game.initNbAction(1);
+		game.addActionIncrement(0, FACTORY_PLAYER_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_PLAYER_PRODUCTION_2);
+		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_2;
+		int initialProduction = factory.getProduction();
+		
+		game.play();
+		
+		Assert.assertEquals("Initial number of cyborgs was modified", initialNbCyborgs, factory.getNbCyborgs());
+		Assert.assertEquals("Initial production was modified", initialProduction, factory.getProduction());
+	}
+	
+	@Test
+	public void incrementWorkOnlyIfLessThanMaxProduction() {
+		Game game = createStandardGame();
+		game.initNbAction(1);
+		game.addActionIncrement(0, FACTORY_PLAYER_PRODUCTION_3, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_PLAYER_PRODUCTION_3);
+		factory.setNbCyborgs(15);
+		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_3;
+		int initialProduction = factory.getProduction();
+		
+		game.play();
+		
+		Assert.assertEquals("Initial number of cyborgs was modified", initialNbCyborgs, factory.getNbCyborgs());
+		Assert.assertEquals("Initial production was modified", initialProduction, factory.getProduction());
+	}
+	
+	@Test
+	public void incrementWorkOnlyIfOwnerIsSameThanAction() {
+		Game game = createStandardGame();
+		game.initNbAction(1);
+		game.addActionIncrement(0, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		factory.setNbCyborgs(15);
+		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_2;
+		int initialProduction = factory.getProduction();
+		
+		game.play();
+		
+		Assert.assertEquals("Initial number of cyborgs was modified", initialNbCyborgs, factory.getNbCyborgs());
+		Assert.assertEquals("Initial production was modified", initialProduction, factory.getProduction());
+	}
+	
+	@Test
+	public void incrementRemoveTenCyborgsAndAddOneProduction () {
+		Game game = createStandardGame();
+		game.initNbAction(1);
+		game.addActionIncrement(0, FACTORY_PLAYER_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_PLAYER_PRODUCTION_2);
+		factory.setNbCyborgs(15);
+		int initialNbCyborgs = factory.getNbCyborgs() + Game.PRODUCTION_2;
+		int initialProduction = factory.getProduction();
+		
+		game.play();
+		
+		Assert.assertEquals("Initial number of cyborgs was not modified", initialNbCyborgs - Game.INCREMENT_CYBORGS_COST, factory.getNbCyborgs());
+		Assert.assertEquals("Initial production was not modified", initialProduction + 1, factory.getProduction());
 	}
 }

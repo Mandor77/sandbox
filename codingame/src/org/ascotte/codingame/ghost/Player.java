@@ -10,17 +10,30 @@ class Game {
 	final static int PRODUCTION_1 = 1;
 	final static int PRODUCTION_2 = 2;
 	final static int PRODUCTION_3 = 3;
+	final static int INCREMENT_CYBORGS_COST = 10;
+	final static int MAX_PRODUCTION = 3;
 	
 	Factory[] factories;
 	Troop[] troops;
+	Action[] actions;
 	Builder builder = new Builder();
 	
 	public Game (int nbFactories) {
 		this.factories = new Factory[nbFactories];
+		this.troops = new Troop[0];
+		this.actions = new Action[0];
 	}
 	
 	public void initNbTroop(int nbTroops) {
 		this.troops = new Troop[nbTroops];
+	}
+	
+	public void initNbAction(int nbActions) {
+		this.actions = new Action[nbActions];
+	}
+	
+	public void addActionIncrement(int id, int from, Owner owner) {
+		this.actions[id] = builder.createActionIncrement(owner, from);
 	}
 	
 	public void addFactory(int id, Owner owner, int production, int nbCyborgs) {
@@ -55,6 +68,25 @@ class Game {
 			}
 		}
 		
+		// Action management
+		for (int id = 0; id < actions.length; id++) {
+			Action action = this.actions[id];
+			// Increment management
+			switch (action.action) {
+				case INCREMENT:
+					Factory factory = this.factories[action.getFrom()];
+					if (factory.getOwner() == action.getOwner()) {
+						if (factory.getNbCyborgs() >= INCREMENT_CYBORGS_COST && factory.getProduction() < MAX_PRODUCTION) {
+							factory.removeCyborgs(INCREMENT_CYBORGS_COST);
+							factory.increaseProduction();
+						}
+					}
+				break;
+				default:
+				break;
+			}
+		}
+		
 		// Battle management
 		for (int id = 0; id < troops.length; id++) {
 			Troop troop = this.troops[id];
@@ -78,6 +110,51 @@ class Game {
 	}
 }
 
+class Action {
+	Actions action;
+	Owner owner;
+	int from;
+	int to;
+	int nbCyborgs;
+	
+	public Action(Actions action, Owner owner) {
+		this.action = action;
+		this.owner = owner;
+	}
+
+	public Actions getAction() {
+		return this.action;
+	}
+
+	public Owner getOwner() {
+		return this.owner;
+	}
+	
+	public int getFrom() {
+		return this.from;
+	}
+	
+	public int getTo() {
+		return this.to;
+	}
+	
+	public int getNbCyborgs() {
+		return this.nbCyborgs;
+	}
+	
+	public void setFrom(int from) {
+		this.from = from;
+	}
+	
+	public void setTo(int to) {
+		this.to = to;
+	}
+	
+	public void setNbCyborgs(int nbCyborgs) {
+		this.nbCyborgs = nbCyborgs;
+	}
+}
+	
 class Troop {
 	int id;
 	Owner owner;
@@ -218,6 +295,10 @@ class Factory {
 		}
 	}
 	
+	public void increaseProduction() {
+		this.production += 1;
+	}
+	
 	public void resolveBattle() {
 		if (this.playerNbCyborgs == this.opponentNbCyborgs) {
 			// Do Nothing
@@ -268,6 +349,30 @@ class Builder {
 		troop.setRemainingTurns(remainingTurns);
 		return troop;
 	}
+	
+	public Action createActionMove(Owner owner, int from, int to, int nbCyborgs) {
+		Action action = new Action(Actions.MOVE, owner);
+		action.setFrom(from);
+		action.setTo(to);
+		action.setNbCyborgs(nbCyborgs);
+		return action;
+	}
+	
+	public Action createActionIncrement(Owner owner, int from) {
+		Action action = new Action(Actions.INCREMENT, owner);
+		action.setFrom(from);
+		return action;
+	}
+	
+	public Action createActionWait(Owner owner) {
+		Action action = new Action(Actions.WAIT, owner);
+		return action;
+	}
+	
+	public Action createActionBomb(Owner owner) {
+		Action action = new Action(Actions.BOMB, owner);
+		return action;
+	}
 }
 
 enum Owner {
@@ -277,4 +382,8 @@ enum Owner {
 	Owner(int owner) {
 		this.owner = owner;
 	}
+}
+
+enum Actions {
+	MOVE, INCREMENT, BOMB, WAIT;
 }
