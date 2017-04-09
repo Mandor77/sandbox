@@ -28,6 +28,8 @@ public class PlayerTest {
 		game.addFactory(FACTORY_OPPONENT_PRODUCTION_2, Owner.OPPONENT, Game.PRODUCTION_2, NB_CYBORGS_2);
 		game.addFactory(FACTORY_OPPONENT_PRODUCTION_3, Owner.OPPONENT, Game.PRODUCTION_3, NB_CYBORGS_5);
 		game.initDistance(FIXED_DISTANCE);
+		Game.NB_PLAYER_BOMBS = 0;
+		Game.NB_OPPONENT_BOMBS = 0;
 		return game;
 	}
 	
@@ -369,6 +371,47 @@ public class PlayerTest {
 		Assert.assertEquals("Too many bombs", Game.MAX_NB_BOMBS_PER_OWNER, game.getNbBombs());
 	}
 	
-	// Do a factory send a bomb can not send a troop
+	@Test
+	public void cantLaunchBothBombAndTroopFromSameFactory() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
+		game.addActionBomb(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Bomb was not created", 1, game.getNbBombs());
+		Assert.assertEquals("Troop was created", 0, game.getNbTroops());
+	}
 	
+	@Test
+	public void canLaunchBothBombAndTroopFromDifferentFactory() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Bomb was not created", 1, game.getNbBombs());
+		Assert.assertEquals("Troop was not created", 1, game.getNbTroops());
+	}
+	
+	@Test
+	public void cantLaunchABombFromANotOwnedFactory() {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.OPPONENT);
+		
+		game.play();
+		
+		Assert.assertEquals("Bomb was created", 0, game.getNbBombs());
+	}
+	
+	@Test
+	public void cantLaunchABombWithSameFromAndToFactory() {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_PLAYER_PRODUCTION_2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Bomb was created", 0, game.getNbBombs());
+	}
 }

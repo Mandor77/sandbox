@@ -54,50 +54,52 @@ class Game {
 		return this.distances[from][to];
 	}
 	
-	public void addTroop() {
+	public void incrementTroop() {
 		this.nbTroops++;
 	}
 	
-	public void addAction() {
+	public void incrementAction() {
 		this.nbActions++;
 	}
 	
-	public void addBomb() {
+	public void incrementBomb() {
 		this.nbBombs++;
 	}
-	
-	public void addAction(int nbActions) {
-		this.actions = new Action[nbActions];
-	}
-	
+
 	public void addActionIncrement(int from, Owner owner) {
 		this.actions[this.nbActions] = builder.createActionIncrement(owner, from);
-		addAction();
+		incrementAction();
 	}
 	
 	public void addActionMove(int from, int to, int nbCyborgs, Owner owner) {
 		this.actions[this.nbActions] = builder.createActionMove(owner, from, to, nbCyborgs);
-		addAction();
+		incrementAction();
 	}
 	
 	public void addActionBomb(int from, int to, Owner owner){
 		this.actions[this.nbActions] = builder.createActionBomb(owner, from, to);
-		addAction();
+		incrementAction();
 	}
+	
+	public void addActionWait(Owner owner) {
+		this.actions[this.nbActions] = builder.createActionWait(owner);
+		incrementAction();
+	}
+	
 	public void addFactory(int id, Owner owner, int production, int nbCyborgs) {
 		this.factories[id] = builder.createFactory(id, owner, production, nbCyborgs);
 	}
 	
 	public void addTroop(Owner owner, int from, int to, int nbCyborgs, int remainingTurns) {
 		this.troops[this.nbTroops] = builder.createTroop(owner, from, to, nbCyborgs, remainingTurns);
-		addTroop();
+		incrementTroop();
 	}
 	
 	public void addBomb(Owner owner, int from, int to, int remainingTurns) {
 		this.bombs[this.nbBombs] = builder.createBomb(owner, from, to, remainingTurns);
 		if (owner.equals(Owner.PLAYER)) { NB_PLAYER_BOMBS++; }
 		else if (owner.equals(Owner.OPPONENT)) { NB_OPPONENT_BOMBS++; }
-		addBomb();
+		incrementBomb();
 	}
 	
 	public Factory getFactory(int id) {
@@ -124,12 +126,59 @@ class Game {
 		return this.nbBombs;
 	}
 	
-	public void play(){
-		
+	private void moveManagement() {
 		// Move management
 		for (int id = 0; id < this.nbTroops; id++) {
 			Troop troop = this.troops[id];
 			troop.move();
+		}	
+	}
+	
+	private void actionManagement() {
+		// Validate action
+		for (int id = 0; id < this.nbActions; id++) {
+			Action action = this.actions[id];
+			Factory fromFactory = this.factories[action.getFrom()];
+			Factory toFactory = this.factories[action.getTo()];
+			switch (action.action) {
+				case MOVE:
+					// Not same owner => invalid
+					if (!fromFactory.getOwner().equals(action.getOwner())) {
+						action.invalidate();
+					}
+					// Same factory => invalid
+					if (fromFactory.getId()==toFactory.getId()) {
+						action.invalidate();
+					}
+				break;
+				case INCREMENT:
+					// Not same owner => invalid
+					if (!fromFactory.getOwner().equals(action.getOwner())) {
+						action.invalidate();
+					}
+				break;
+				case BOMB:
+					// Not same owner => invalid
+					if (!fromFactory.getOwner().equals(action.getOwner())) {
+						action.invalidate();
+					}
+					// Same factory => invalid
+					if (fromFactory.getId()==toFactory.getId()) {
+						action.invalidate();
+					}
+					// Valid bomb invalid all other action, including second bomb ?
+					if (action.isValid()) {
+						for (int id2 = 0; id2 < this.nbActions; id2++) {
+							Action action2 = this.actions[id2];
+							if (!action2.equals(action)) {
+								if (fromFactory.equals(this.factories[action2.getFrom()])) {
+									action2.invalidate();
+								}
+							}
+						}
+					}
+				break;
+			}
 		}
 		
 		// Action management
@@ -140,7 +189,7 @@ class Game {
 			// Increment management
 			switch (action.action) {
 				case INCREMENT:
-					if (fromFactory.getOwner() == action.getOwner()) {
+					if (action.isValid()) {
 						if (fromFactory.getNbCyborgs() >= INCREMENT_CYBORGS_COST && fromFactory.getProduction() < MAX_PRODUCTION) {
 							fromFactory.removeCyborgs(INCREMENT_CYBORGS_COST);
 							fromFactory.increaseProduction();
@@ -148,7 +197,7 @@ class Game {
 					}
 				break;
 				case BOMB:
-					if (fromFactory.getOwner() == action.getOwner() && fromFactory.getId()!=toFactory.getId()) {
+					if (action.isValid()) {
 						if (action.getOwner().equals(Owner.PLAYER) && NB_PLAYER_BOMBS < MAX_NB_BOMBS_PER_OWNER ||
 								action.getOwner().equals(Owner.OPPONENT) && NB_OPPONENT_BOMBS < MAX_NB_BOMBS_PER_OWNER) {
 							int remainingTurns = getDistance(fromFactory.getId(), toFactory.getId());
@@ -157,19 +206,24 @@ class Game {
 					}
 				break;
 				case MOVE:
-					if (fromFactory.getOwner() == action.getOwner() && fromFactory.getId()!=toFactory.getId()) {
+					if (action.isValid()) {
 						int nbCyborgsSent = Math.min(fromFactory.getNbCyborgs(), action.getNbCyborgs());
 						int remainingTurns = getDistance(fromFactory.getId(), toFactory.getId());
 						this.addTroop(action.getOwner(), fromFactory.getId(), toFactory.getId(), nbCyborgsSent, remainingTurns);
 						fromFactory.removeCyborgs(nbCyborgsSent);
 					}
 				break;
+				case WAIT:
+					// Do Nothing
+				break;
 				default:
 				break;
 			}
 		}
 		this.nbActions = 0;
-		
+	}
+	
+	private void productionManagement() {
 		// Production management
 		for (int id = 0; id < factories.length; id++) {
 			Factory factory = this.factories[id];
@@ -177,7 +231,9 @@ class Game {
 				factory.addProductionToNbCyborgs();
 			}
 		}
-		
+	}
+	
+	private void battleManagement() {
 		// Battle management
 		for (int id = 0; id < this.nbTroops; id++) {
 			Troop troop = this.troops[id];
@@ -191,13 +247,23 @@ class Game {
 				}
 			}
 		}
-		
+	}
+	
+	private void ownershipManagement() {
 		// Ownership management
 		for (int id = 0; id < factories.length; id++) {
 			Factory factory = this.factories[id];
 			factory.resolveBattle();
 		}
-
+	}
+	
+	public void play(){
+		
+		moveManagement();
+		actionManagement();
+		productionManagement();
+		battleManagement();
+		ownershipManagement();
 	}
 }
 
@@ -248,10 +314,12 @@ class Action {
 	int from;
 	int to;
 	int nbCyborgs;
+	boolean isValid;
 	
 	public Action(Actions action, Owner owner) {
 		this.action = action;
 		this.owner = owner;
+		this.isValid = true;
 	}
 
 	public Actions getAction() {
@@ -284,6 +352,14 @@ class Action {
 	
 	public void setNbCyborgs(int nbCyborgs) {
 		this.nbCyborgs = nbCyborgs;
+	}
+	
+	public boolean isValid() {
+		return isValid;
+	}
+	
+	public void invalidate() {
+		this.isValid = false;
 	}
 }
 	
