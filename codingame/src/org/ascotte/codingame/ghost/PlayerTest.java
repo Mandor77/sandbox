@@ -33,8 +33,12 @@ public class PlayerTest {
 		return game;
 	}
 	
+	/**
+	 * Tests on standard factory production
+	 */
+	
 	@Test
-	public void productionIsDoneForOwnedFactoryWithProduction() {
+	public void ownedFactoryProduceCyborgs() {
 		Game game = createStandardGame();
 		
 		game.play();
@@ -46,7 +50,7 @@ public class PlayerTest {
 	}
 	
 	@Test
-	public void productionIsNotDoneForOwnedFactoryWithoutProduction() {
+	public void ownedFactoryWithoutProductionDoesntProduceCyborgs() {
 		Game game = createStandardGame();
 		
 		game.play();
@@ -56,15 +60,125 @@ public class PlayerTest {
 	}
 	
 	@Test
-	public void productionIsNotDoneForNotOwnedFactory() {
+	public void neutralFactoryDoesntProduceCyborgs() {
 		Game game = createStandardGame();
 		Factory factory = game.getFactory(FACTORY_NEUTRAL_PRODUCTION_2);
 		int initialNbCyborgs = factory.getNbCyborgs();
 		
 		game.play();
 		
-		Assert.assertEquals("Production is done for not owned factory", initialNbCyborgs, factory.getNbCyborgs());
+		Assert.assertEquals("Production is done for neutral factory", initialNbCyborgs, factory.getNbCyborgs());
 	}
+	
+	/**
+	 * Tests on troop creation
+	 */
+	
+	@Test
+	public void moveOrderCreateATroop () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troop was not created", 1, game.getNbTroops());
+	}
+	
+	@Test
+	public void moveOrdersCreateTroops () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.PLAYER);
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_3, FACTORY_OPPONENT_PRODUCTION_2, 3, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troops was not created", 2, game.getNbTroops());
+	}
+	
+	@Test
+	public void moveOrderMustBeDoneFromAOwnedFactory () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.OPPONENT);
+		game.addActionMove(FACTORY_NEUTRAL_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troop was created", 0, game.getNbTroops());
+	}
+	
+	@Test
+	public void moveOrderRemoveCyborgsFromFactory () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
+		int initialNumberOfCyborg = factory.getNbCyborgs();
+		
+		game.play();
+		
+		Assert.assertEquals("From factory don't have the correct number of cyborg", Math.max(0, initialNumberOfCyborg - 1), factory.getNbCyborgs());
+	}
+	
+	@Test
+	public void moveOrderRemoveCyborgsFromFactoryOnlyIfCyborgsAreAvailable () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
+		Factory fromFactory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
+		int fromFactoryNbCyborgs = fromFactory.getNbCyborgs();
+		
+		game.play();
+		
+		Assert.assertEquals("From factory don't have the correct number of cyborg", 0, fromFactory.getNbCyborgs());
+		Assert.assertEquals("Cyborg number can not be higher than cyborg number in the from factory", fromFactoryNbCyborgs, game.getTroop(0).getNbCyborgs());
+	}
+	
+	@Test
+	public void moveOrdersCanTargetManyFactories () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_3, 1, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troop was not created", 2, game.getNbTroops());
+	}
+	
+	@Test
+	public void moveOrdersCantTargetTheSameFactory () {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troop was not created", 1, game.getNbTroops());
+	}
+	
+	@Test
+	public void moveOrderCantTargetTheFromFactory() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_PLAYER_PRODUCTION_2, 2, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Troop was created", 0, game.getNbTroops());
+	}
+	
+	
+	@Test
+	public void moveUseCorrectDistanceToSetRemainingTurn() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
+		Factory fromFactory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
+		Factory toFactory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		int distance = game.getDistance(fromFactory.getId(), toFactory.getId());
+		
+		game.play();
+		
+		Assert.assertEquals("Remaining turn number is not correct", distance, game.getTroop(0).getRemainingTurns());
+	
+	}
+	
+	
 	
 	@Test
 	public void troopMoveOfOneByTurn() {
@@ -249,97 +363,7 @@ public class PlayerTest {
 		Assert.assertEquals("Initial production was not modified", initialProduction + 1, factory.getProduction());
 	}
 	
-	@Test
-	public void moveCreateATroop () {
-		Game game = createStandardGame();
-		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.PLAYER);
-		
-		game.play();
-		
-		Assert.assertEquals("Troop was not created", 1, game.getNbTroops());
-	}
-	
-	@Test
-	public void severalMoveCreateSeveralTroops () {
-		Game game = createStandardGame();
-		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.PLAYER);
-		game.addActionMove(FACTORY_PLAYER_PRODUCTION_3, FACTORY_OPPONENT_PRODUCTION_2, 3, Owner.PLAYER);
-		
-		game.play();
-		
-		Assert.assertEquals("Troops was not created", 2, game.getNbTroops());
-	}
-	
-	@Test
-	public void moveCreateATroopOnlyIfOwnerIsSameThanFromFactory () {
-		Game game = createStandardGame();
-		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 2, Owner.OPPONENT);
-		
-		game.play();
-		
-		Assert.assertEquals("Troop was created", 0, game.getNbTroops());
-	}
-	
-	@Test
-	public void moveCannotUseMoreThanFactoryNbCyborgs () {
-		Game game = createStandardGame();
-		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
-		Factory fromFactory = game.getFactory(FACTORY_PLAYER_PRODUCTION_2);
-		int fromFactoryNbCyborgs = fromFactory.getNbCyborgs();
-		
-		game.play();
-		
-		Assert.assertEquals("Cyborg number can not be higher than cyborg number in the from factory", fromFactoryNbCyborgs, game.getTroop(0).getNbCyborgs());
-	}
-	
-	@Test
-	public void moveRemoveCyborgsFromFactory () {
-		Game game = createStandardGame();
-		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
-		Factory factory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
-		int initialNumberOfCyborg = factory.getNbCyborgs();
-		
-		game.play();
-		
-		Assert.assertEquals("From factory don't have the correct number of cyborg", Math.max(0, initialNumberOfCyborg - 1), factory.getNbCyborgs());
-	}
-	
-	@Test
-	public void moveRemoveMaximumCyborgsFromFactory() {
-		Game game = createStandardGame();
-		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
-		Factory factory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
-		int initialNumberOfCyborg = factory.getNbCyborgs();
-		
-		game.play();
-		
-		Assert.assertEquals("From factory don't have the correct number of cyborg", Math.max(0, initialNumberOfCyborg - 2), factory.getNbCyborgs());
-	}
-	
-	@Test
-	public void moveCantBeDoneOnSameFactory() {
-		Game game = createStandardGame();
-		game.addActionMove(FACTORY_PLAYER_PRODUCTION_2, FACTORY_PLAYER_PRODUCTION_2, 2, Owner.PLAYER);
-		
-		game.play();
-		
-		Assert.assertEquals("Troop was created", 0, game.getNbTroops());
-	}
-	
-	
-	@Test
-	public void moveUseCorrectDistanceToSetRemainingTurn() {
-		Game game = createStandardGame();
-		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 1, Owner.PLAYER);
-		Factory fromFactory = game.getFactory(FACTORY_PLAYER_NO_PRODUCTION);
-		Factory toFactory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
-		int distance = game.getDistance(fromFactory.getId(), toFactory.getId());
-		
-		game.play();
-		
-		Assert.assertEquals("Remaining turn number is not correct", distance, game.getTroop(0).getRemainingTurns());
-	
-	}
+
 	
 	@Test
 	public void aTroopMoveAndWinAFactoryOnceArrived() {
@@ -372,7 +396,7 @@ public class PlayerTest {
 	}
 	
 	@Test
-	public void cantLaunchBothBombAndTroopFromSameFactory() {
+	public void cantLaunchBothBombAndTroopFromSameFactoryAndToSameFactory() {
 		Game game = createStandardGame();
 		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
 		game.addActionBomb(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
@@ -381,6 +405,18 @@ public class PlayerTest {
 		
 		Assert.assertEquals("Bomb was not created", 1, game.getNbBombs());
 		Assert.assertEquals("Troop was created", 0, game.getNbTroops());
+	}
+	
+	@Test
+	public void catLaunchBothBombAndTroopFromSameFactoryAndNotToSameFactory() {
+		Game game = createStandardGame();
+		game.addActionMove(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_2, 25, Owner.PLAYER);
+		game.addActionBomb(FACTORY_PLAYER_NO_PRODUCTION, FACTORY_OPPONENT_PRODUCTION_3, Owner.PLAYER);
+		
+		game.play();
+		
+		Assert.assertEquals("Bomb was not created", 1, game.getNbBombs());
+		Assert.assertEquals("Troop was not created", 1, game.getNbTroops());
 	}
 	
 	@Test
@@ -414,4 +450,104 @@ public class PlayerTest {
 		
 		Assert.assertEquals("Bomb was created", 0, game.getNbBombs());
 	}
+	
+	//TODO : Vérifier le moteur du jeu pour vérifier le tour d'inactivation
+	@Test
+	public void bombInactivateProductionWhenArrivedDuring5Turns() {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		
+		// Turn 1 to Turn 2 : bomb is in move
+		// Turn 3 to Turn 7 : bomb was explosed and inactivate the factory
+		// Turn 8 : factory is active
+		game.play();
+		Assert.assertEquals("Turn 1 : Factory is inactive instead of active", true, factory.isActive());
+		game.play();
+		Assert.assertEquals("Turn 2 : Factory is inactive instead of active", true, factory.isActive());
+		game.play();
+		Assert.assertEquals("Turn 3 : Factory is active instead of inactive", false, factory.isActive());
+		game.play();
+		Assert.assertEquals("Turn 4 : Factory is active instead of inactive", false, factory.isActive());
+		game.play();
+		Assert.assertEquals("Turn 5 : Factory is active instead of inactive", false, factory.isActive());
+		game.play();
+		Assert.assertEquals("Turn 6 : Factory is active instead of inactive", false, factory.isActive());
+		game.play();
+		Assert.assertEquals("Turn 7 : Factory is active instead of inactive", false, factory.isActive());
+		game.play();
+		Assert.assertEquals("Turn 8 : Factory is inactive instead of active", true, factory.isActive());
+	}
+	
+	@Test
+	public void inactiveFactoryDoNotProduceCyborgs() {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		game.play();
+		game.play();
+		factory.setNbCyborgs(0);
+		
+		game.play();
+		
+		Assert.assertEquals("Production is active", 0, factory.getNbCyborgs());
+	}
+	
+	@Test
+	public void bombReduceNbCyborgsBy2 () {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		game.play();
+		game.play();
+		factory.setNbCyborgs(24);
+		int nbCyborgs = factory.getNbCyborgs();
+		
+		game.play();
+		
+		Assert.assertEquals("Cyborgs number is not correct", nbCyborgs / 2, factory.getNbCyborgs());
+	}
+	
+	@Test
+	public void bombReduceNbCyborgsBy2ForImpair () {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		game.play();
+		game.play();
+		factory.setNbCyborgs(33);
+		
+		game.play();
+		
+		Assert.assertEquals("Cyborgs number is not correct", 17, factory.getNbCyborgs());
+	}
+	
+	@Test
+	public void bombReduceNbCyborgsByMinimum10 () {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		game.play();
+		game.play();
+		factory.setNbCyborgs(12);
+		
+		game.play();
+		
+		Assert.assertEquals("Cyborgs number is not correct", 2, factory.getNbCyborgs());
+	}
+	
+	@Test
+	public void bombReduceNbCyborgsByMinimum10WhenMinimum10 () {
+		Game game = createStandardGame();
+		game.addActionBomb(FACTORY_PLAYER_PRODUCTION_2, FACTORY_OPPONENT_PRODUCTION_2, Owner.PLAYER);
+		Factory factory = game.getFactory(FACTORY_OPPONENT_PRODUCTION_2);
+		game.play();
+		game.play();
+		factory.setNbCyborgs(6);
+		
+		game.play();
+		
+		Assert.assertEquals("Cyborgs number is not correct", 0, factory.getNbCyborgs());
+	}
+
 }

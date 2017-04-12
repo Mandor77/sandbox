@@ -17,6 +17,8 @@ class Game {
 	final static int MAX_NB_BOMBS_PER_OWNER = 2;
 	static int NB_PLAYER_BOMBS = 0;
 	static int NB_OPPONENT_BOMBS = 0;
+	final static int NB_INACTIVE_TURN_AFTER_BOMB = 5;
+	final static int FLOOR_NB_CYBORGS_KILLED_BY_BOMB = 10;
 	
 	Factory[] factories;
 	Troop[] troops;
@@ -131,7 +133,12 @@ class Game {
 		for (int id = 0; id < this.nbTroops; id++) {
 			Troop troop = this.troops[id];
 			troop.move();
-		}	
+		}
+		
+		for (int id = 0; id < this.nbBombs; id++) {
+			Bomb bomb = this.bombs[id];
+			bomb.move();
+		}
 	}
 	
 	private void actionManagement() {
@@ -149,6 +156,18 @@ class Game {
 					// Same factory => invalid
 					if (fromFactory.getId()==toFactory.getId()) {
 						action.invalidate();
+					}
+					// Valid troop invalid all other troops sent from same factory
+					if (action.isValid()) {
+						for (int id2 = 0; id2 < this.nbActions; id2++) {
+							Action action2 = this.actions[id2];
+							if (!action2.equals(action) && action2.action.equals(Actions.MOVE)) {
+								if (fromFactory.equals(this.factories[action2.getFrom()]) &&
+										toFactory.equals(this.factories[action2.getTo()])) {
+									action2.invalidate();
+								}
+							}
+						}
 					}
 				break;
 				case INCREMENT:
@@ -171,7 +190,8 @@ class Game {
 						for (int id2 = 0; id2 < this.nbActions; id2++) {
 							Action action2 = this.actions[id2];
 							if (!action2.equals(action)) {
-								if (fromFactory.equals(this.factories[action2.getFrom()])) {
+								if (fromFactory.equals(this.factories[action2.getFrom()]) &&
+										toFactory.equals(this.factories[action2.getTo()])) {
 									action2.invalidate();
 								}
 							}
@@ -227,7 +247,7 @@ class Game {
 		// Production management
 		for (int id = 0; id < factories.length; id++) {
 			Factory factory = this.factories[id];
-			if (factory.getOwner() != Owner.NOBODY) {
+			if (factory.getOwner() != Owner.NOBODY && factory.isActive()) {
 				factory.addProductionToNbCyborgs();
 			}
 		}
@@ -257,9 +277,36 @@ class Game {
 		}
 	}
 	
+	private void bombManagement() {
+		for (int id = 0; id < this.nbBombs; id++) {
+			Bomb bomb = this.bombs[id];
+			if (bomb.getRemainingTurns() == 0) {
+				Factory factory = this.factories[bomb.getTo()];
+				factory.inactivate(NB_INACTIVE_TURN_AFTER_BOMB);
+				
+				int nbCyborgs = factory.getNbCyborgs();
+				if (nbCyborgs <= FLOOR_NB_CYBORGS_KILLED_BY_BOMB) {
+					factory.removeCyborgs(nbCyborgs);
+				}
+				else {
+					factory.removeCyborgs(Math.max(FLOOR_NB_CYBORGS_KILLED_BY_BOMB, (nbCyborgs / 2)));
+				}
+			}
+		}
+	}
+	
+	private void factoryManagement() {
+		for (int id = 0; id < factories.length; id++) {
+			Factory factory = this.factories[id];
+			factory.restoreInactivation(1);
+		}
+	}
+	
 	public void play(){
 		
+		factoryManagement();
 		moveManagement();
+		bombManagement();
 		actionManagement();
 		productionManagement();
 		battleManagement();
@@ -306,6 +353,10 @@ class Bomb {
 	
 	public int getTo() {
 		return this.to;
+	}
+	
+	public void move() {
+		this.remainingTurns--;
 	}
 }
 class Action {
@@ -414,7 +465,7 @@ class Troop {
 	}
 	
 	public void move() {
-		this.remainingTurns -= 1;
+		this.remainingTurns--;
 	}
 }
 
@@ -425,9 +476,12 @@ class Factory {
 	int nbCyborgs;
 	int playerNbCyborgs;
 	int opponentNbCyborgs;
+	boolean active;
+	int inactiveRemainingTurn;
 
 	public Factory(int id) {
 		this.id = id;
+		this.active = true;
 	}
 
 	public int getId() {
@@ -499,6 +553,24 @@ class Factory {
 	
 	public void increaseProduction() {
 		this.production += 1;
+	}
+	
+	public void inactivate(int inactiveRemainingTurn) {
+		this.active = false;
+		this.inactiveRemainingTurn = inactiveRemainingTurn;
+	}
+	
+	public boolean isActive() {
+		return this.active;
+	}
+	
+	public void restoreInactivation(int nbTurn) {
+		if (this.inactiveRemainingTurn > 0) {
+			this.inactiveRemainingTurn--;
+		}
+		if (this.inactiveRemainingTurn == 0) {
+			this.active = true;
+		}
 	}
 	
 	public void resolveBattle() {
