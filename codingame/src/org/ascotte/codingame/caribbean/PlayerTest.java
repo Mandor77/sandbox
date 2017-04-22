@@ -27,7 +27,7 @@ public class PlayerTest {
 	public Boat createBoat(int id, int x, int y, int direction) {
 		Boat boat = null;
 		try{
-			boat = engine.createBoat(id, x, y, direction);
+			boat = engine.createBoat(id, x, y, direction, Engine.OWNER_PLAYER);
 		}
 		catch (InvalidBoatLocationException e) {
 			
@@ -90,7 +90,7 @@ public class PlayerTest {
 	public void cantCreateABoatOutsideTheGrid() 
 			throws InvalidBoatLocationException, InvalidBoatIdException {
 		
-		Boat boat = engine.createBoat(PLAYER_BOAT_0, 21, 21, Engine.DIRECTION_RIGHT);
+		Boat boat = engine.createBoat(PLAYER_BOAT_0, 21, 21, Engine.DIRECTION_RIGHT, Engine.OWNER_PLAYER);
 	}
 	
 	@Test
@@ -219,14 +219,14 @@ public class PlayerTest {
 	@Test(expected=InvalidBoatIdException.class)
 	public void boatIdShouldBeUnique() 
 			throws InvalidBoatIdException, InvalidBoatLocationException {
-		Boat boat = engine.createBoat(PLAYER_BOAT_0, 6, 4, Engine.DIRECTION_DOWN_LEFT);
-		Boat secondBoat = engine.createBoat(PLAYER_BOAT_0, 6, 4, Engine.DIRECTION_DOWN_LEFT);
+		Boat boat = engine.createBoat(PLAYER_BOAT_0, 6, 4, Engine.DIRECTION_DOWN_LEFT, Engine.OWNER_PLAYER);
+		Boat secondBoat = engine.createBoat(PLAYER_BOAT_0, 6, 4, Engine.DIRECTION_DOWN_LEFT, Engine.OWNER_PLAYER);
 	}
 	
 	@Test(expected=InvalidBoatIdException.class)
 	public void boatIdShouldBeLessThanMaximalBoatNumber() 
 			throws InvalidBoatIdException, InvalidBoatLocationException {
-		Boat boat = engine.createBoat(Engine.MAX_NUMBER_OF_BOATS, 6, 4, Engine.DIRECTION_DOWN_LEFT);
+		Boat boat = engine.createBoat(Engine.MAX_NUMBER_OF_BOATS, 6, 4, Engine.DIRECTION_DOWN_LEFT, Engine.OWNER_PLAYER);
 	}
 	
 	@Test
@@ -262,7 +262,7 @@ public class PlayerTest {
 	@Test
 	public void boatWithInitialSpeedTo0GoFasterWhenMoveForward() {
 		Boat boat = this.createBoat(PLAYER_BOAT_0, 6, 4, Engine.DIRECTION_RIGHT);
-		boat.setTarget(grid.get(8, 5));
+		boat.setTarget(grid.get(10, 4));
 		
 		engine.play();
 		
@@ -273,10 +273,23 @@ public class PlayerTest {
 	public void boatWithInitialMaxSpeedDontGoFasterWhenMoveForward() {
 		Boat boat = this.createBoat(PLAYER_BOAT_0, 6, 4, Engine.DIRECTION_RIGHT);
 		boat.setSpeed(Engine.MAX_SPEED);
-		boat.setTarget(grid.get(8, 5));
+		boat.setTarget(grid.get(10, 4));
 		
 		engine.play();
 		
 		Assert.assertEquals("Boat speed should be 1", 1, boat.getSpeed());
+	}
+	
+	@Test
+	public void boatMoveForward() {
+		Boat boat = this.createBoat(PLAYER_BOAT_0, 6, 4, Engine.DIRECTION_RIGHT);
+		boat.setTarget(grid.get(10, 4));
+		boat.setSpeed(Engine.MAX_SPEED);
+		
+		engine.play();
+		
+		Assert.assertEquals("Boat location is not correct", boat, grid.get(7, 4).getBoat());
+		Assert.assertEquals("Boat location is not correct", boat, grid.get(6, 4).getBoat());
+		Assert.assertEquals("Boat location is not correct", boat, grid.get(8, 4).getBoat());
 	}
 }

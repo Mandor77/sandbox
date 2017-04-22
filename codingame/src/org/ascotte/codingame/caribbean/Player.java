@@ -11,21 +11,48 @@ import java.math.*;
  **/
 class Player {
 
+	static int nbTurn = 0;
+	
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
 
+        // create a grid
+        Engine engine = new Engine();
+        engine.createGrid(Engine.GRID_WIDTH, Engine.GRID_HEIGHT);
+        
         while (true) {
             int myShipCount = in.nextInt(); // the number of remaining ships
             int entityCount = in.nextInt(); // the number of entities (e.g. ships, mines or cannonballs)
             for (int i = 0; i < entityCount; i++) {
                 int entityId = in.nextInt();
                 String entityType = in.next();
+                
                 int x = in.nextInt();
                 int y = in.nextInt();
-                int arg1 = in.nextInt();
-                int arg2 = in.nextInt();
-                int arg3 = in.nextInt();
-                int arg4 = in.nextInt();
+                int direction = in.nextInt();
+                int speed = in.nextInt();
+                int rumQuantity = in.nextInt();
+                int owner = in.nextInt();
+                
+                if("SHIP".equals(entityType)) {
+                	if (nbTurn == 0) {
+                		try {
+                			engine.createBoat(entityId, x, y, direction, owner);
+                		}
+                		catch (InvalidBoatLocationException e) {
+                			System.err.println(e.getMessage());
+                		}
+                		catch (InvalidBoatIdException e) {
+                			System.err.println(e.getMessage());
+                		}
+                	}
+                	else {
+                		engine.getBoat(entityId).setDirection(direction);
+                		engine.getBoat(entityId).setSpeed(speed);
+                		engine.getBoat(entityId).setRumQuantity(rumQuantity);
+                		engine.setBoatLocation(entityId, x, y);
+                	}
+                }
             }
             
             
@@ -55,6 +82,8 @@ class Engine {
 	final static int SPEED_1 = 1;
 	final static int SPEED_2 = 2;
 	final static int MAX_SPEED = 1;
+	final static int OWNER_PLAYER = 0;
+	final static int OWNER_OPPONENT = 1;
 	
 	Grid grid = null;
 	
@@ -65,7 +94,7 @@ class Engine {
     	return this.grid;
     }
     
-    public Boat createBoat(int id, int x, int y, int direction) 
+    public Boat createBoat(int id, int x, int y, int direction, int owner) 
     		throws InvalidBoatLocationException, InvalidBoatIdException{
     	if (id >= MAX_NUMBER_OF_BOATS) {
 			StringBuffer buffer = new StringBuffer();
@@ -82,7 +111,7 @@ class Engine {
 			buffer.append("Boat location is incorrect x=").append(x).append(" y=").append(y);
 			throw new InvalidBoatLocationException(buffer.toString());
     	}
-    	Boat boat = new Boat(grid.get(x, y), direction);
+    	Boat boat = new Boat(grid.get(x, y), direction, owner);
     	boat.drawBoat(grid);
     	boats[id] = boat;
     	return boat;
@@ -107,6 +136,14 @@ class Engine {
     		cell = boat.getLocation();
 		}
     	return cell;
+    }
+    
+    public void setBoatLocation(int id, int x, int y) {
+    	Boat boat = boats[id];
+		Cell location = grid.get(x, y);
+		if (boat != null) {
+			boat.setLocation(location);
+		}
     }
     
     public void play() {
@@ -402,13 +439,19 @@ class Boat {
 	int rumQuantity;
 	boolean isAlive;
 	int speed;
+	int owner;
 	
-	public Boat(Cell location, int direction) {
+	public Boat(Cell location, int direction, int owner) {
 		this.location = location;
 		this.direction = direction;
 		this.rumQuantity = Engine.DEFAULT_RUM_QUANTITY;
 		this.isAlive = true;
 		this.speed = Engine.SPEED_0;
+		this.owner = owner;
+	}
+	
+	public int getOwner() {
+		return this.owner;
 	}
 	
 	public int getSpeed() {
@@ -431,6 +474,10 @@ class Boat {
 		return location;
 	}
 	
+	public void setLocation(Cell location) {
+		this.location = location;
+	}
+	
 	public void kill() {
 		this.isAlive = false;
 	}
@@ -441,6 +488,14 @@ class Boat {
 	
 	public void speedIncrease() {
 		this.speed++;
+	}
+	
+	public void setRumQuantity(int rumQuantity) {
+		this.rumQuantity = rumQuantity;
+	}
+	
+	public void setDirection(int direction) {
+		this.direction = direction;
 	}
 	
 	public void removeRumQuantity(int rumQuantityToRemove) {
