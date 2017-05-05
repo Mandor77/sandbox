@@ -13,6 +13,7 @@ class Player {
     public static void main(String args[]) {
     	Engine engine = new Engine();
         Scanner in = new Scanner(System.in);
+        Cube cube = new Cube();
         
         // game loop
         while (true) {
@@ -24,6 +25,7 @@ class Player {
             int boatIds = 0;
             int barrelIds = 0;
             int mineIds = 0;
+            
 
             for (int i = 0; i < entityCount; i++) {
             	long startEntity = System.nanoTime();
@@ -44,6 +46,14 @@ class Player {
                 	engine.setBoatRumQuantity(boatIds, arg3);
                 	engine.setBoatSpeed(boatIds, arg2);
                 	engine.setBoatDirection(boatIds, arg1);
+                	
+                	engine.setMineX(mineIds, x);
+                	engine.setMineY(mineIds, y);
+                	mineIds++;
+                	cube = engine.getBoatNextMove(boatIds);
+                	engine.setMineX(mineIds, cube.getOffsetX());
+                	engine.setMineY(mineIds, cube.getOffsetY());
+                	mineIds++;
                 	boatIds++;
                 }
                 else if ("BARREL".equals(entityType)) {
@@ -70,16 +80,20 @@ class Player {
             // Pour chaque bateau
             for (int boatId = 0; boatId < boatIds; boatId++) {
             	if (engine.getBoatOwner(boatId) == Engine.PLAYER) {
-            		int barrelId = engine.chooseClosestBarrel(boatId, barrelIds);
-            		System.err.println("Locked barril id = " + barrelId);
             		
-            		if (barrelId != -1) {
-            			//engine.moveToBarrel(boatId, barrelId);
-            			engine.chooseBestPath(boatId, barrelId, mineIds, boatIds);
-            		}
-            		else {
-            			engine.chooseBestPath(boatId, barrelId, mineIds, boatIds);
-            			// Do something
+            		if (!engine.playBlockedBoat(boatId, boatIds)) {
+            		
+            			int barrelId = engine.chooseClosestBarrel(boatId, barrelIds);
+            			System.err.println("Locked barril id = " + barrelId);
+            		
+            			if (barrelId != -1) {
+            				//engine.moveToBarrel(boatId, barrelId);
+            				engine.chooseBestPath(boatId, barrelId, mineIds, boatIds);
+            			}
+            			else {
+            				engine.chooseBestPath(boatId, barrelId, mineIds, boatIds);
+            				// Do something
+            			}
             		}
             	}	
             }
@@ -183,6 +197,14 @@ class Engine {
 		return this.boatOwner[TURN][id];
 	}
 	
+	public Cube getBoatNextMove(int boatId) {
+		Cube source = cubes[17];
+		source.setCube(this.boatX[TURN][boatId], this.boatY[TURN][boatId]);
+		source.move(this.boatDirection[TURN][boatId]);
+		
+		return source;
+	}
+	
 	public void moveToBarrel(int boatId, int barrelId) {
 		int targetX = this.barrelX[TURN][barrelId];
 		int targetY = this.barrelY[TURN][barrelId];
@@ -233,6 +255,8 @@ class Engine {
 		
 		source.setCube(this.boatX[TURN][boatId], this.boatY[TURN][boatId]);
 		
+		boolean isCurrentMine = checkMine(source, mineIds);
+		
 		next.setCube(this.boatX[TURN][boatId], this.boatY[TURN][boatId]);
 		next.move(this.boatDirection[TURN][boatId]);
 		boolean isNextMine = checkMine(next, mineIds);
@@ -282,7 +306,7 @@ class Engine {
 			target.setCube(this.barrelX[TURN][barrelId], this.barrelY[TURN][barrelId]);
 		}
 		else {
-			target.setCube(TURN%20, TURN%20);
+			target.setCube(Math.min(TURN%20+boatId,WIDTH-1), Math.min(TURN%20+boatId,HEIGHT-1));
 		}
 		
 		int directionNextTarget = CubeOperation.getZone(next, target);
@@ -319,16 +343,20 @@ class Engine {
 			if ((angleSourceTarget > 0 && angleSourceTarget <= 3) || (angleSourceTarget <= -3)) {
 				if (!isSourceAfterStarboardUpMine && !isSourceAfterStarboardDownMine) {
 					if (this.boatPreviousMove[TURN][boatId] != Action.PORT) {
-						this.starboard(boatId);
-						return;
+						if (!isCurrentMine) {
+							this.starboard(boatId);
+							return;
+						}
 					}
 				}
 			}
 			else {
 				if (!isSourceAfterPortUpMine && !isSourceAfterPortDownMine) {
 					if (this.boatPreviousMove[TURN][boatId] != Action.STARBOARD) {
-						this.port(boatId);
-						return;
+						if (!isCurrentMine) {
+							this.port(boatId);
+							return;
+						}
 					}
 				}
 			}
@@ -342,14 +370,18 @@ class Engine {
 			}
 			if (!isSourceAfterStarboardUpMine && !isSourceAfterStarboardDownMine) {
 				if (this.boatPreviousMove[TURN][boatId] != Action.PORT) {
-					this.starboard(boatId);
-					return;
+					if (!isCurrentMine) {
+						this.starboard(boatId);
+						return;
+					}
 				}
 			}
 			if (!isSourceAfterPortUpMine && !isSourceAfterPortDownMine) {
 				if (this.boatPreviousMove[TURN][boatId] != Action.STARBOARD) {
-					this.port(boatId);
-					return;
+					if (!isCurrentMine) {
+						this.port(boatId);
+						return;
+					}
 				}
 			}
 			
@@ -415,6 +447,49 @@ class Engine {
 		this.nothing(boatId, boatIds);
 		return;
 	}
+	
+	public boolean playBlockedBoat(int boatId, int boatIds) {
+		
+		if (TURN > 0) {
+			
+			if (this.boatX[TURN][boatId] == this.boatX[TURN-1][boatId] &&
+					this.boatY[TURN][boatId] == this.boatY[TURN-1][boatId] &&
+						this.boatDirection[TURN][boatId] == this.boatDirection[TURN-1][boatId]) {
+				
+				if (boatPreviousMove[TURN][boatId] != Action.FIRE) {
+					Cube source = cubes[15];
+					Cube target = cubes[16];
+				
+					source.setCube(this.boatX[TURN][boatId], this.boatY[TURN][boatId]);
+					for (int id = 0; id < boatIds; id++) {
+						if (this.boatOwner[TURN][id] == OPPONENT) {
+							target.setCube(this.boatX[TURN][id], this.boatY[TURN][id]);
+							int distanceSourceTarget = CubeOperation.getNbCases(source, target);
+							if (distanceSourceTarget < 3) {
+								Action.fire(target.getOffsetX(), target.getOffsetY());
+								boatPreviousMove[TURN+1][boatId] = Action.FIRE;
+								return true;
+							}
+						}
+					}
+				}
+				// Si le bateau a déjà tiré
+				if (TURN%2 == 0) {
+					System.err.println("MOVE HAZARD");
+					this.starboard(boatId);
+					return true;
+				}
+				else {
+					System.err.println("MOVE HAZARD");
+					this.port(boatId);
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+	
 	
 	public void slower(int boatId) {
 		boatPreviousMove[TURN+1][boatId] = Action.SLOWER;
