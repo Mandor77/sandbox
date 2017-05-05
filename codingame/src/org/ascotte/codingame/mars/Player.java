@@ -1,4 +1,5 @@
 package org.ascotte.codingame.mars;
+import java.util.LinkedList;
 import java.util.Scanner;
 
 /**
@@ -7,7 +8,7 @@ import java.util.Scanner;
  **/
 class Player {
 
-	static Vaisseau vaisseau = new Vaisseau();
+	static Ship ship = new Ship();
 	static int MAX_POWER = 4;
 	static int MIN_POWER = 0;
 	static int MAX_ROTATION = 15;
@@ -20,42 +21,48 @@ class Player {
 	static int MAX_X = 7000;
 	static int MIN_Y = 0;
 	static int MAX_Y = 3000;
+	static int MAX_VSPEED_TO_LAND = 40;
+	static int MAX_HSPEED_TO_LAND = 20;	
 	static double G = 3.711;
+	
+	static World world = new World(MAX_X, MAX_Y);
 	
     public static void main(String args[]) {
        
     	Scanner in = new Scanner(System.in);
-       
+    	
     	int surfaceN = in.nextInt(); // the number of points used to draw the surface of Mars.
-        int previousLandX = -1;
+    	int previousLandX = -1;
         int previousLandY = -1;
-        int targetStartLandX = -1; 
-        int targetEndLandX = -1;
-        int targetLandY = -1;
         
-        for (int i = 0; i < surfaceN; i++) {
+    	for (int i = 0; i < surfaceN; i++) {
         	int landX = in.nextInt(); // X coordinate of a surface point. (0 to 6999)
             int landY = in.nextInt(); // Y coordinate of a surface point. By linking all the points together in a sequential fashion, you form the surface of Mars.
-            if (previousLandY == landY) {
-            	targetStartLandX = previousLandX;
-            	targetEndLandX = landX;
-            	targetLandY = landY;
+            
+            if (i == 0) { continue; }
+            else {
+            	if(landY == previousLandY) {
+            		world.addCrashSegment(previousLandX, previousLandY, landX, landY);
+            	}
+            	else {
+            		world.addLandSegment(previousLandX, previousLandY, landX, landY);
+            	}
+            	
             }
+            
             previousLandX = landX;
             previousLandY = landY;
         }
 
-        
-        
         // game loop
         while (true) {
-            vaisseau.position.x = in.nextInt();
-            vaisseau.position.y = in.nextInt();
-            vaisseau.hSpeed = in.nextInt(); // the horizontal speed (in m/s), can be negative.
-            vaisseau.vSpeed = in.nextInt(); // the vertical speed (in m/s), can be negative.
-            vaisseau.fuel = in.nextInt(); // the quantity of remaining fuel in liters.
-            vaisseau.rotate = in.nextInt(); // the rotation angle in degrees (-90 to 90).
-            vaisseau.power = in.nextInt(); // the thrust power (0 to 4).
+            ship.position.x = in.nextInt();
+            ship.position.y = in.nextInt();
+            ship.hSpeed = in.nextInt(); // the horizontal speed (in m/s), can be negative.
+            ship.vSpeed = in.nextInt(); // the vertical speed (in m/s), can be negative.
+            ship.fuel = in.nextInt(); // the quantity of remaining fuel in liters.
+            ship.rotate = in.nextInt(); // the rotation angle in degrees (-90 to 90).
+            ship.power = in.nextInt(); // the thrust power (0 to 4).
 
 
             // rotate power. rotate is the desired rotation angle. power is the desired thrust power.
@@ -64,53 +71,70 @@ class Player {
         
     }
 
-	public static void move(Vaisseau vaisseau, World world, int rotate, int power) throws InvalidPositionException {
+	public static void move(int rotate, int power) {
 
 		// Power calculation
-		power = vaisseau.power + Integer.signum(power-vaisseau.power);
+		power = ship.power + Integer.signum(power-ship.power);
 		power = Math.min(Math.max(power, MIN_POWER), MAX_POWER);
 		
 		// Rotation calculation
-		rotate = vaisseau.rotate + (Math.min(Math.abs(rotate), MAX_ROTATION)) * Integer.signum(rotate);
+		rotate = ship.rotate + (Math.min(Math.abs(rotate), MAX_ROTATION)) * Integer.signum(rotate);
 		rotate = Math.min(Math.max(rotate, MIN_ANGLE), MAX_ANGLE);
 		
 		// Vertical speed calculation
-		vaisseau.vSpeed = vaisseau.vSpeed - G + (double)vaisseau.power;
-		vaisseau.vSpeed = Math.min(Math.max(vaisseau.vSpeed, MIN_SPEED), MAX_SPEED);
+		ship.vSpeed = ship.vSpeed - G + (double)ship.power;
+		ship.vSpeed = Math.min(Math.max(ship.vSpeed, MIN_SPEED), MAX_SPEED);
 		
 		// New vertical location
-		double initialY = vaisseau.position.y;
-		vaisseau.position.y += vaisseau.vSpeed;
-		double endY = vaisseau.position.y;
+		double startY = ship.position.y;
+		ship.position.y += ship.vSpeed;
+		double endY = ship.position.y;
 		
 		// Check obstacles
-		checkObstacles(vaisseau, world, initialY, endY);
+		checkEndOfMap(endY);
+		checkObstacles(ship.position.x, startY, ship.position.x, endY);
+		checkLanding(ship.position.x, startY, ship.position.x, endY);
 		
 		// Update properties
-		vaisseau.power = power;
-		vaisseau.rotate = rotate;
-		vaisseau.fuel -= power;
+		ship.power = power;
+		ship.rotate = rotate;
+		ship.fuel -= power;
 	}
 	
-	public static void checkObstacles(Vaisseau vaisseau, World world, double initialY, double endY) {
+	public static void checkEndOfMap(double endY) {
 		
-		int minY = 0;
-		int maxY = 0;
-		if (initialY < endY) {
-			minY = (int) Math.ceil(initialY);
-			maxY = (int) Math.floor(endY);
-		} else {
-			minY = (int) Math.ceil(endY);
-			maxY = (int) Math.floor(initialY);
+		if (endY < 0 || endY >= world.y) {
+			ship.crash();
 		}
+	}
+	
+	public static void checkObstacles(double startX, double startY, double endX, double endY) {
 		
-		for(int i = minY; i <= maxY; i++) {
-			if (world.platform[(int) vaisseau.position.x][i]) {
-				vaisseau.isCrashed = true;
+		Segment shipSegment = new Segment(startX, startY, endX, endY);
+		
+		for (Segment worldSegment:world.crashSegments) {
+			if (Segment.checkIntersection(shipSegment, worldSegment)){
+					ship.crash();
 			}
 		}
 	}
 	
+	public static void checkLanding(double startX, double startY, double endX, double endY) {
+		
+		Segment shipSegment = new Segment(startX, startY, endX, endY);
+		
+		for (Segment worldSegment:world.landSegments) {
+			if (Segment.checkIntersection(shipSegment, worldSegment)){
+				if (ship.rotate == 0 && Math.abs(ship.hSpeed) < MAX_HSPEED_TO_LAND &&
+						Math.abs(ship.vSpeed) < MAX_VSPEED_TO_LAND) {
+							ship.land();	
+				}
+				else {
+					ship.crash();
+				}
+			}
+		}
+	}
 }
 
 class Position {
@@ -120,7 +144,7 @@ class Position {
 	Position(double x, double y) { this.x = x; this.y = y;}
 }
 
-class Vaisseau {
+class Ship {
 	Position position;
 	double hSpeed;
 	double vSpeed;
@@ -128,38 +152,97 @@ class Vaisseau {
 	int rotate;
 	int power;
 	boolean isCrashed;
+	boolean isLanded;
 	
-	Vaisseau() {
+	Ship() {
 		position = new Position();
+	}
+	
+	void land() {
+		this.isLanded = true;
+	}
+	
+	void crash() {
+		this.isCrashed = true;
 	}
 }
 
 class World {
-	boolean[][] platform;
+	int[] platform;
+	LinkedList<Segment> crashSegments = new LinkedList<Segment>();
+	LinkedList<Segment> landSegments = new LinkedList<Segment>();
 	int x;
 	int y;
 	
 	World(int x, int y) {
-		this.platform = new boolean[x][y];
+		this.platform = new int[x];
 		this.x = x;
 		this.y = y;
 	}
 	
-	void draw(int x, int y) {
-		// Invalid draw
-		if (x < 0 || x > this.x || y < 0 || y > this.y) { return; }
-		this.platform[x][y] = true;
-		return;
+	void addCrashSegment(int startX, int startY, int endX, int endY) {
+		this.crashSegments.add(new Segment(startX, startY, endX, endY));
+	}
+	
+	void addLandSegment(int startX, int startY, int endX, int endY) {
+		this.landSegments.add(new Segment(startX, startY, endX, endY));
 	}
 }
 
-class InvalidPositionException extends Exception {
-	int x;
-	int y;
-	public InvalidPositionException(int x, int y) {
-		this.x = x;
-		this.y = y;
+class Segment {
+	double startX;
+	double startY;
+	double endX;
+	double endY;
+	double a;
+	double b;
+	
+	Segment(double startX, double startY, double endX, double endY) {
+		double a = Double.NaN;
+		
+		if (startX > endX || (startX == endX && startY > endY)) {
+			double tempX = startX;
+			double tempY = startY;
+			startX = endX;
+			startY = endY;
+			endX = tempX;
+			endY = tempY;
+		}
+		
+		if (endX != startX) { a = (endY - startY) / (endX - startX); }
+		else { a = Double.POSITIVE_INFINITY; }
+		this.b = startY - a * startX;
+		this.startX = startX;
+		this.endX = endX;
+		this.startY = startY;
+		this.endY = endY;
+		this.a = a;
+	}
+	
+	static boolean checkIntersection(Segment segment1, Segment segment2) {
+		double xCollision = 0d;
+		double yCollision = 0d;
+		
+		if (segment1.a == segment2.a) { return false; }
+		if (Double.isInfinite(segment1.a)) {
+			yCollision = segment2.a * segment1.startX + segment2.b;
+			if (yCollision >= segment1.startY && yCollision <= segment1.endY) {
+				return true;
+			}
+		}
+		if (Double.isInfinite(segment2.a)) {
+			yCollision = segment1.a * segment2.startX + segment1.b;
+			if (yCollision >= segment2.startY && yCollision <= segment2.endY) {
+				return true;
+			}
+		}
+		
+		xCollision = (segment1.b - segment2.b) / (segment2.a - segment1.a);
+		if (xCollision >= segment1.startX && xCollision >= segment2.startX &&
+				xCollision <= segment1.endX && xCollision <= segment2.endX) {
+			return true;
+		}
+		return false;
 	}
 }
-
 

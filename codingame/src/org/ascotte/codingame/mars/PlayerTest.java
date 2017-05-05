@@ -12,41 +12,41 @@ public class PlayerTest {
 	@Test
 	@Ignore
 	public void testPhysicalEngineFirstScenario(){
-		Vaisseau vaisseau = createInitialVaisseau();
+		Ship ship = createInitialShip();
 		
-		this.move(vaisseau, -45, Player.MAX_POWER);
+		this.move(-45, Player.MAX_POWER);
 		
-		Assert.assertEquals("Horizontal value is wrong", 4950, vaisseau.position.x);
-		Assert.assertEquals("Vertical value is wrong", 2498, vaisseau.position.y);
-		Assert.assertEquals("hSpeed value is wrong", -51, vaisseau.hSpeed, 0);
-		Assert.assertEquals("vSpeed value is wrong", -3, vaisseau.vSpeed, 0);
-		Assert.assertEquals("Fuel value is wrong", 999, vaisseau.fuel);
-		Assert.assertEquals("Rotate value is wrong", 75, vaisseau.rotate);
-		Assert.assertEquals("Power value is wrong", 1, vaisseau.power);
+		Assert.assertEquals("Horizontal value is wrong", 4950, ship.position.x);
+		Assert.assertEquals("Vertical value is wrong", 2498, ship.position.y);
+		Assert.assertEquals("hSpeed value is wrong", -51, ship.hSpeed, 0);
+		Assert.assertEquals("vSpeed value is wrong", -3, ship.vSpeed, 0);
+		Assert.assertEquals("Fuel value is wrong", 999, ship.fuel);
+		Assert.assertEquals("Rotate value is wrong", 75, ship.rotate);
+		Assert.assertEquals("Power value is wrong", 1, ship.power);
 	}
 	
 	@Test
 	@Ignore
 	public void testPhysicalEngineThirdScenario(){
-		Vaisseau vaisseau = new Vaisseau();
-		vaisseau.position = new Position();
-		vaisseau.position.x = 2500;
-		vaisseau.position.y = 2499;
-		vaisseau.hSpeed = -0;
-		vaisseau.vSpeed = -3;
-		vaisseau.fuel = 499;
-		vaisseau.rotate = 0;
-		vaisseau.power = 1;
+		Ship ship = new Ship();
+		ship.position = new Position();
+		ship.position.x = 2500;
+		ship.position.y = 2499;
+		ship.hSpeed = -0;
+		ship.vSpeed = -3;
+		ship.fuel = 499;
+		ship.rotate = 0;
+		ship.power = 1;
 		
-		this.move(vaisseau, 0, 3);
+		this.move(0, 3);
 		
-		Assert.assertEquals("Horizontal value is wrong", 2500, vaisseau.position.x);
-		Assert.assertEquals("Vertical value is wrong", 2495, vaisseau.position.y);
-		Assert.assertEquals("hSpeed value is wrong", 0, vaisseau.hSpeed, 0);
-		Assert.assertEquals("vSpeed value is wrong", -4, vaisseau.vSpeed, 0);
-		Assert.assertEquals("Fuel value is wrong", 497, vaisseau.fuel);
-		Assert.assertEquals("Rotate value is wrong", 0, vaisseau.rotate);
-		Assert.assertEquals("Power value is wrong", 2, vaisseau.power);
+		Assert.assertEquals("Horizontal value is wrong", 2500, ship.position.x);
+		Assert.assertEquals("Vertical value is wrong", 2495, ship.position.y);
+		Assert.assertEquals("hSpeed value is wrong", 0, ship.hSpeed, 0);
+		Assert.assertEquals("vSpeed value is wrong", -4, ship.vSpeed, 0);
+		Assert.assertEquals("Fuel value is wrong", 497, ship.fuel);
+		Assert.assertEquals("Rotate value is wrong", 0, ship.rotate);
+		Assert.assertEquals("Power value is wrong", 2, ship.power);
 	}
 	
 	/**
@@ -55,17 +55,17 @@ public class PlayerTest {
 	@Test
 	@Ignore
 	public void testPhysicalEngineSecondScenario(){
-		Vaisseau vaisseau = new Vaisseau();
-		this.move(vaisseau, -45, Player.MAX_POWER);
-		this.move(vaisseau, -45, Player.MAX_POWER);
+		Ship ship = new Ship();
+		this.move(-45, Player.MAX_POWER);
+		this.move(-45, Player.MAX_POWER);
 		
-		Assert.assertEquals("Horizontal value is wrong", 4898, vaisseau.position.x);
-		Assert.assertEquals("Vertical value is wrong", 2493, vaisseau.position.y);
-		Assert.assertEquals("hSpeed value is wrong", -53, vaisseau.hSpeed, 0);
-		Assert.assertEquals("vSpeed value is wrong", -6, vaisseau.vSpeed, 0);
-		Assert.assertEquals("Fuel value is wrong", 997, vaisseau.fuel);
-		Assert.assertEquals("Rotate value is wrong", 60, vaisseau.rotate);
-		Assert.assertEquals("Power value is wrong", 2, vaisseau.power);
+		Assert.assertEquals("Horizontal value is wrong", 4898, ship.position.x);
+		Assert.assertEquals("Vertical value is wrong", 2493, ship.position.y);
+		Assert.assertEquals("hSpeed value is wrong", -53, ship.hSpeed, 0);
+		Assert.assertEquals("vSpeed value is wrong", -6, ship.vSpeed, 0);
+		Assert.assertEquals("Fuel value is wrong", 997, ship.fuel);
+		Assert.assertEquals("Rotate value is wrong", 60, ship.rotate);
+		Assert.assertEquals("Power value is wrong", 2, ship.power);
 	}
 	
 	/**
@@ -74,12 +74,12 @@ public class PlayerTest {
 	
 	@Test
 	public void testOverMaximalPower(){
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.power = Player.MAX_POWER;
+		Ship ship = createInitialShip();
+		ship.power = Player.MAX_POWER;
 		
-		this.move(vaisseau, -45, Player.MAX_POWER + 1);
+		this.move(-45, Player.MAX_POWER + 1);
 		
-		Assert.assertEquals("Power is wrong", Player.MAX_POWER, vaisseau.power);
+		Assert.assertEquals("Power is wrong", Player.MAX_POWER, ship.power);
 	}
 	
 	/**
@@ -87,12 +87,12 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testOverMinimalPower() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.power = Player.MIN_POWER;
+		Ship ship = createInitialShip();
+		ship.power = Player.MIN_POWER;
 		
-		this.move(vaisseau, -45, Player.MIN_POWER - 1);
+		this.move(-45, Player.MIN_POWER - 1);
 		
-		Assert.assertEquals("Power is wrong", Player.MIN_POWER, vaisseau.power);
+		Assert.assertEquals("Power is wrong", Player.MIN_POWER, ship.power);
 	}
 	
 	/**
@@ -100,22 +100,22 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testOnlyOnePowerUpChange() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.power = 2;
+		Ship ship = createInitialShip();
+		ship.power = 2;
 		
-		this.move(vaisseau, 0, 4);
+		this.move(0, 4);
 		
-		Assert.assertEquals("Fuel is wrong", 3, vaisseau.power);
+		Assert.assertEquals("Fuel is wrong", 3, ship.power);
 	}
 	
 	@Test
 	public void testOnlyOnePowerDownChange() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.power = 3;
+		Ship ship = createInitialShip();
+		ship.power = 3;
 		
-		this.move(vaisseau, 0, 1);
+		this.move(0, 1);
 		
-		Assert.assertEquals("Fuel is wrong", 2, vaisseau.power);
+		Assert.assertEquals("Fuel is wrong", 2, ship.power);
 	}
 	
 	/**
@@ -123,13 +123,13 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testOverMaximalRotation() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.rotate = 0;
-		int initialRotate = vaisseau.rotate;
+		Ship ship = createInitialShip();
+		ship.rotate = 0;
+		int initialRotate = ship.rotate;
 		
-		this.move(vaisseau, initialRotate + Player.MAX_ROTATION + 1, vaisseau.power);
+		this.move(initialRotate + Player.MAX_ROTATION + 1, ship.power);
 		
-		Assert.assertEquals("Rotation is wrong", initialRotate + Player.MAX_ROTATION, vaisseau.rotate);
+		Assert.assertEquals("Rotation is wrong", initialRotate + Player.MAX_ROTATION, ship.rotate);
 	}
 	
 	/**
@@ -137,13 +137,13 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testOverMinimalRotation() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.rotate = 0;
-		int initialRotate = vaisseau.rotate;
+		Ship ship = createInitialShip();
+		ship.rotate = 0;
+		int initialRotate = ship.rotate;
 		
-		this.move(vaisseau, initialRotate + Player.MIN_ROTATION - 1, vaisseau.power);
+		this.move(initialRotate + Player.MIN_ROTATION - 1, ship.power);
 		
-		Assert.assertEquals("Rotation is wrong", initialRotate + Player.MIN_ROTATION, vaisseau.rotate);
+		Assert.assertEquals("Rotation is wrong", initialRotate + Player.MIN_ROTATION, ship.rotate);
 	}
 	
 	/**
@@ -151,14 +151,14 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testRotation() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.rotate = 0;
-		int initialRotate = vaisseau.rotate;
+		Ship ship = createInitialShip();
+		ship.rotate = 0;
+		int initialRotate = ship.rotate;
 		int rotate = 10;
 		
-		this.move(vaisseau, rotate, vaisseau.power);
+		this.move(rotate, ship.power);
 		
-		Assert.assertEquals("Rotation is wrong", initialRotate + rotate, vaisseau.rotate);
+		Assert.assertEquals("Rotation is wrong", initialRotate + rotate, ship.rotate);
 	}
 	
 	/**
@@ -166,12 +166,12 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testOverMaximalAngle() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.rotate = Player.MAX_ANGLE - 1;
+		Ship ship = createInitialShip();
+		ship.rotate = Player.MAX_ANGLE - 1;
 		
-		this.move(vaisseau, 15, vaisseau.power);
+		this.move(15, ship.power);
 		
-		Assert.assertEquals("Angle is wrong", Player.MAX_ANGLE, vaisseau.rotate);
+		Assert.assertEquals("Angle is wrong", Player.MAX_ANGLE, ship.rotate);
 	}
 	
 	/**
@@ -179,12 +179,12 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testOverMinimalAngle() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.rotate = Player.MIN_ANGLE + 1;
+		Ship ship = createInitialShip();
+		ship.rotate = Player.MIN_ANGLE + 1;
 		
-		this.move(vaisseau, -15, vaisseau.power);
+		this.move(-15, ship.power);
 		
-		Assert.assertEquals("Angle is wrong", Player.MIN_ANGLE, vaisseau.rotate);
+		Assert.assertEquals("Angle is wrong", Player.MIN_ANGLE, ship.rotate);
 	}
 	
 	/**
@@ -192,15 +192,15 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testOverMinimalVerticalSpeed() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.hSpeed = 0;
-		vaisseau.vSpeed = Player.MIN_SPEED;
-		vaisseau.rotate = 0;
-		vaisseau.power = 0;
+		Ship ship = createInitialShip();
+		ship.hSpeed = 0;
+		ship.vSpeed = Player.MIN_SPEED;
+		ship.rotate = 0;
+		ship.power = 0;
 		
-		this.move(vaisseau, 0, vaisseau.power);
+		this.move(0, ship.power);
 		
-		Assert.assertEquals("VSpeed is wrong", Player.MIN_SPEED, vaisseau.vSpeed, 0);
+		Assert.assertEquals("VSpeed is wrong", Player.MIN_SPEED, ship.vSpeed, 0);
 	}
 	
 	@Test
@@ -208,15 +208,15 @@ public class PlayerTest {
 	 * Test than ship can't go over maximal speed
 	 */
 	public void testOverMaximalVerticalSpeed() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.hSpeed = 0;
-		vaisseau.vSpeed = Player.MAX_SPEED;
-		vaisseau.rotate = 0;
-		vaisseau.power = 4;
+		Ship ship = createInitialShip();
+		ship.hSpeed = 0;
+		ship.vSpeed = Player.MAX_SPEED;
+		ship.rotate = 0;
+		ship.power = 4;
 		
-		this.move(vaisseau, 0, vaisseau.power);
+		this.move(0, ship.power);
 		
-		Assert.assertEquals("VSpeed is wrong", Player.MAX_SPEED, vaisseau.vSpeed, 0);
+		Assert.assertEquals("VSpeed is wrong", Player.MAX_SPEED, ship.vSpeed, 0);
 	}
 	
 	/** 
@@ -224,13 +224,13 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testFuelIsUsed() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.power = 2;
-		int initialFuel = vaisseau.fuel;
+		Ship ship = createInitialShip();
+		ship.power = 2;
+		int initialFuel = ship.fuel;
 		
-		this.move(vaisseau, 0, 3);
+		this.move(0, 3);
 		
-		Assert.assertEquals("Fuel is wrong", initialFuel - 3, vaisseau.fuel);
+		Assert.assertEquals("Fuel is wrong", initialFuel - 3, ship.fuel);
 	}
 	
 	/**
@@ -238,17 +238,17 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testMoveWithOnlyGravity() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.rotate = 0;
-		vaisseau.hSpeed = 0;
-		vaisseau.vSpeed = -6;
-		double initialPositionY = vaisseau.position.y;
-		double initialVSpeed = vaisseau.vSpeed;
-		this.move(vaisseau, 0, 0);
-		this.move(vaisseau, 0, 0);
+		Ship ship = createInitialShip();
+		ship.rotate = 0;
+		ship.hSpeed = 0;
+		ship.vSpeed = -6;
+		double initialPositionY = ship.position.y;
+		double initialVSpeed = ship.vSpeed;
+		this.move(0, 0);
+		this.move(0, 0);
 		
-		Assert.assertEquals("Speed with only gravity is not correct", initialVSpeed + Player.G * -2, vaisseau.vSpeed, 0);
-		Assert.assertEquals("Position with only gravity is not correct", initialPositionY + initialVSpeed + Player.G * -1 + initialVSpeed + Player.G * -2, vaisseau.position.y, 0);
+		Assert.assertEquals("Speed with only gravity is not correct", initialVSpeed + Player.G * -2, ship.vSpeed, 0);
+		Assert.assertEquals("Position with only gravity is not correct", initialPositionY + initialVSpeed + Player.G * -1 + initialVSpeed + Player.G * -2, ship.position.y, 0);
 	}
 	
 	/**
@@ -256,47 +256,161 @@ public class PlayerTest {
 	 */
 	@Test
 	public void testShipCrashWhenEncounterObstacle() {
-		Vaisseau vaisseau = createInitialVaisseau();
-		vaisseau.rotate = 0;
-		vaisseau.hSpeed = 0;
-		World world = createInitialWorld();
-		world.draw(4999,2499);
-		world.draw(5000,2499);
-		world.draw(5001,2499);
+		Ship ship = createInitialShip();
+		ship.rotate = 0;
+		ship.hSpeed = 0;
+		Player.world.addCrashSegment(4990, 2499,  5010,  2499);
 		
-		this.move(vaisseau, 0, 0);
+		this.move(0, 0);
 		
-		Assert.assertEquals("Ship is not crashed", true, vaisseau.isCrashed);
+		Assert.assertEquals("Ship is not crashed", true, ship.isCrashed);
+	}
+
+	/**
+	 * Test than ship land if encounter during move an platform
+	 */
+	@Test
+	public void testShipLandWhenEncounterPlatform() {
+		Ship ship = createInitialShip();
+		ship.rotate = 0;
+		ship.hSpeed = 0;
+		Player.world.addLandSegment(4990, 2499,  5010,  2499);
+		
+		this.move(0, 0);
+		
+		Assert.assertEquals("Ship is not landed", true, ship.isLanded);
 	}
 	
-	//TODO : Ajouter les tests sur les depassements de carte
-	
-	public Vaisseau createInitialVaisseau() {
-		Vaisseau vaisseau = new Vaisseau();
-		vaisseau.position = new Position();
-		vaisseau.position.x = 5000;
-		vaisseau.position.y = 2500;
-		vaisseau.hSpeed = -50;
-		vaisseau.vSpeed = 0;
-		vaisseau.fuel = 1000;
-		vaisseau.rotate = 90;
-		vaisseau.power = 0;
-		return vaisseau;
+	/**
+	 * Test than ship not land if angle is not correct
+	 */
+	@Test
+	public void testShipNotLandWhenAngleIsNotCorrect() {
+		Ship ship = createInitialShip();
+		ship.rotate = 15;
+		ship.hSpeed = 0;
+		Player.world.addLandSegment(4990, 2499,  5010,  2499);
+		
+		this.move(0, 0);
+		
+		Assert.assertEquals("Ship should not landed", false, ship.isLanded);
+		Assert.assertEquals("Ship should crashed", true, ship.isCrashed);
 	}
 	
-	public World createInitialWorld() {
-		World world = new World(Player.MAX_X, Player.MAX_Y);
+	/**
+	 * Test than ship not land if hspeed is not correct
+	 */
+	@Test
+	public void testShipNotLandWhenHSpeedIsNotCorrect() {
+		Ship ship = createInitialShip();
+		ship.rotate = 0;
+		ship.hSpeed = Player.MAX_HSPEED_TO_LAND+1;
+		Player.world.addLandSegment(4990, 2499,  5010,  2499);
 		
-		return world;
+		this.move(0, 0);
+		
+		Assert.assertEquals("Ship should not landed", false, ship.isLanded);
+		Assert.assertEquals("Ship should crashed", true, ship.isCrashed);
 	}
 	
-	public void move(Vaisseau vaisseau, int rotate, int power) {
-		World world = createInitialWorld();
+	/**
+	 * Test than ship not land if vspeed is not correct
+	 */
+	@Test
+	public void testShipNotLandWhenVSpeedIsNotCorrect() {
+		Ship ship = createInitialShip();
+		ship.rotate = 0;
+		ship.hSpeed = 0;
+		ship.vSpeed = -Player.MAX_VSPEED_TO_LAND-1;
+		Player.world.addLandSegment(4990, 2499,  5010,  2499);
 		
-			try {
-				Player.move(vaisseau, world, rotate, power);
-			} catch (InvalidPositionException e) {
-				// TODO Auto-generated catch block
-			}
+		this.move(0, 0);
+		
+		Assert.assertEquals("Ship should not landed", false, ship.isLanded);
+		Assert.assertEquals("Ship should crashed", true, ship.isCrashed);
+	}
+	
+	/** 
+	 * Test than ship crash if going outside the map
+	 */
+	@Test
+	public void testShipCrashWhenOutsideVerticalMap() {
+		Ship ship = createInitialShip();
+		ship.position.y = 50;
+		ship.vSpeed = -100;
+		
+		this.move(0, Player.MAX_POWER);
+		
+		Assert.assertEquals("Ship is not crashed", true, ship.isCrashed);
+	}
+	
+	/**
+	 * Test than two parallel segments have no intersection
+	 */
+	@Test
+	public void testParallelSegmentsHaveNoIntersection() {
+		Segment segment1 = new Segment(100, 100, 120, 120);
+		Segment segment2 = new Segment(100, 120, 120, 140);
+		
+		boolean haveIntersection = Segment.checkIntersection(segment1, segment2);
+		
+		Assert.assertEquals("Segments should not have intersection", false, haveIntersection);
+	}
+	
+	/**
+	 * Test than two segments have intersection
+	 */
+	@Test
+	public void testSegmentsHaveIntersection() {
+		Segment segment1 = new Segment(100, 100, 120, 120);
+		Segment segment2 = new Segment(100, 120, 120, 100);
+		
+		boolean haveIntersection = Segment.checkIntersection(segment1, segment2);
+		
+		Assert.assertEquals("Segments should have intersection", true, haveIntersection);
+	}
+	
+	/**
+	 * Test than two segments have no intersection when out of bounds
+	 */
+	@Test
+	public void testSegmentsHaveIntersectionWhenOutOfBounds() {
+		Segment segment1 = new Segment(150, 150, 200, 200);
+		Segment segment2 = new Segment(100, 120, 120, 100);
+		
+		boolean haveIntersection = Segment.checkIntersection(segment1, segment2);
+		
+		Assert.assertEquals("Segments should not have intersection", false, haveIntersection);
+	}
+	
+	/**
+	 * Test than vertical segment have intersection with another segment
+	 */
+	@Test
+	public void testVerticalSegmentHaveIntersectionWithOtherSegment() {
+		Segment segment1 = new Segment(200, 300, 200, 0);
+		Segment segment2 = new Segment(150, 120, 250, 100);
+		
+		boolean haveIntersection = Segment.checkIntersection(segment1, segment2);
+		
+		Assert.assertEquals("Segments should have intersection", true, haveIntersection);
+	}
+	
+	public Ship createInitialShip() {
+		Ship ship = new Ship();
+		Player.ship = ship;
+		ship.position = new Position();
+		ship.position.x = 5000;
+		ship.position.y = 2500;
+		ship.hSpeed = -50;
+		ship.vSpeed = 0;
+		ship.fuel = 1000;
+		ship.rotate = 90;
+		ship.power = 0;
+		return ship;
+	}
+	
+	public void move(int rotate, int power) {
+			Player.move(rotate, power);
 	}
 }
