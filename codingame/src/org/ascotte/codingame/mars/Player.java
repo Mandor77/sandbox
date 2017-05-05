@@ -1,5 +1,7 @@
 package org.ascotte.codingame.mars;
+import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Random;
 import java.util.Scanner;
 
 /**
@@ -25,7 +27,17 @@ class Player {
 	static int MAX_HSPEED_TO_LAND = 20;	
 	static double G = 3.711;
 	
+	// Genetic model
+	static int NB_GENES = 80;
+	static int NB_INDIVIDUS = 20;
+	static int[] rotations = {0};
+	static int[] powers = {0, 4, 4};
+	static int MAX_GENERATIONS = 10;
+	
 	static World world = new World(MAX_X, MAX_Y);
+	
+	static HashSet<Individu> population = new HashSet<Individu>();
+	static HashSet<Individu> nextPopulation = new HashSet<Individu>();
 	
     public static void main(String args[]) {
        
@@ -54,23 +66,98 @@ class Player {
             previousLandY = landY;
         }
 
+    	
+    	
         // game loop
         while (true) {
-            ship.position.x = in.nextInt();
+            /*ship.position.x = in.nextInt();
             ship.position.y = in.nextInt();
             ship.hSpeed = in.nextInt(); // the horizontal speed (in m/s), can be negative.
             ship.vSpeed = in.nextInt(); // the vertical speed (in m/s), can be negative.
             ship.fuel = in.nextInt(); // the quantity of remaining fuel in liters.
             ship.rotate = in.nextInt(); // the rotation angle in degrees (-90 to 90).
             ship.power = in.nextInt(); // the thrust power (0 to 4).
+             */
 
-
+        	for (int i = 0; i < Player.MAX_GENERATIONS; i++) {
+        		// Create population
+        		createPopulation();
+        	
+        		// Select best population
+        		selectPopulationByTournament();
+        	
+        		// Complete population
+        		completeNextPopulation();
+        		
+            	// Mutate population
+            	//mutatePopulation(population);
+        		
+        		HashSet<Individu> tempPopulation = population;
+        		population = nextPopulation;
+        		nextPopulation = tempPopulation;
+        		nextPopulation.clear();
+        	}
+        	
+        	Individu bestIndividu = selectBestIndividu();
+        	
             // rotate power. rotate is the desired rotation angle. power is the desired thrust power.
-            System.out.println("-20 3");
+        	System.err.println("Best evaluation = " + bestIndividu.evaluation);
+            System.out.println(bestIndividu.getFirstGene().rotation + " " + bestIndividu.getFirstGene().power);
         }
-        
+    }
+    
+    public static Individu selectBestIndividu() {
+    	Individu bestIndividu = null;
+    	int bestEvaluation = -1;
+    	
+    	for (Individu individu:population) {
+    		if (individu.evaluation > bestEvaluation) {
+    			bestEvaluation = individu.evaluation;
+    			bestIndividu = individu;
+    		}
+    	}
+    	
+    	return bestIndividu;
+    }
+    
+    
+    public static void completeNextPopulation() {
+    	for (int i = nextPopulation.size(); i < NB_INDIVIDUS; i++) {
+    		Individu individu = new Individu();
+    		individu.generateRandomGenes();
+    		nextPopulation.add(individu);
+    	}
+    }
+    
+    public static void createPopulation() {
+    	for (int i = 0; i < NB_INDIVIDUS; i++) {
+    		Individu individu = new Individu();
+    		individu.generateRandomGenes();
+    		population.add(individu);
+    	}
     }
 
+    public static void selectPopulationByTournament() {
+    	int numIndividu = 0;
+    	Individu previousIndividu = null;
+    	
+    	for (Individu individu:population) {
+    		// Launch the battle
+    		if (numIndividu%2 == 1) {
+    			individu.evaluate();
+    			previousIndividu.evaluate();
+    			if (individu.evaluation >= previousIndividu.evaluation) {
+    				nextPopulation.add(individu);
+    			} else {
+    				nextPopulation.add(previousIndividu);
+    			}
+    		}
+    		
+    		previousIndividu = individu;
+    		numIndividu++;
+    	}
+    }
+    
 	public static void move(int rotate, int power) {
 
 		// Power calculation
@@ -135,6 +222,73 @@ class Player {
 			}
 		}
 	}
+	
+	public static int getDistanceFromShipToTarget() {
+		
+		int distance = 0;
+		for (Segment worldSegment:world.landSegments) {
+			distance += Math.sqrt(Math.pow(worldSegment.startX - ship.position.x, 2) + Math.pow(worldSegment.startY - ship.position.y, 2));
+		}
+		return distance;
+	}
+}
+
+class Individu {
+	LinkedList<Gene> genes = new LinkedList<Gene>();
+	int evaluation = 0;
+	
+	Individu() {
+	}
+	
+	void evaluate() {
+		
+		Ship backupShip = Player.ship.clone();
+		int evaluation = 0;
+		
+		for (Gene gene:genes) {
+			if (Player.ship.isCrashed || Player.ship.isLanded) { break;}
+			Player.move(gene.rotation, gene.power);
+		}
+		
+		// If ship is crashed
+		if (Player.ship.isCrashed) {
+			evaluation = 0;
+		}
+		// If ship is landed
+		else if (Player.ship.isLanded) {
+			evaluation = 10000;
+		}
+		else {
+			evaluation = Player.getDistanceFromShipToTarget();
+		}
+		
+		this.evaluation = evaluation;
+		Player.ship = backupShip;
+	}
+	
+	Gene getFirstGene() {
+		return genes.getFirst();
+	}
+	void generateRandomGenes() {
+		for (int i = 0; i < Player.NB_GENES; i++) {
+			Gene gene = new Gene();
+			gene.generateRandomAttributes();
+			genes.add(gene);
+		}
+	}
+}
+
+class Gene {
+	int rotation;
+	int power;
+	
+	void generateRandomAttributes() {
+		Random rand = new Random();
+		int randomRotationId = rand.nextInt(Player.rotations.length);
+		int randomPowerId = rand.nextInt(Player.powers.length);
+		this.rotation = Player.rotations[randomRotationId];
+		this.power = Player.powers[randomPowerId];
+	}
 }
 
 class Position {
@@ -144,7 +298,7 @@ class Position {
 	Position(double x, double y) { this.x = x; this.y = y;}
 }
 
-class Ship {
+class Ship implements Cloneable {
 	Position position;
 	double hSpeed;
 	double vSpeed;
@@ -164,6 +318,16 @@ class Ship {
 	
 	void crash() {
 		this.isCrashed = true;
+	}
+	
+	public Ship clone() {
+		Object o = null;
+		try {
+			o = super.clone();
+		} catch(CloneNotSupportedException cnse) {
+			cnse.printStackTrace(System.err);
+		}
+		return (Ship)o;
 	}
 }
 
