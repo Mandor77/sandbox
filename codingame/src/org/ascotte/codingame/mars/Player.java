@@ -35,14 +35,14 @@ class Player {
 	final static World world = new World(MAX_X, MAX_Y);
 	
 	// Genetic model parameters
-	final static int NB_GENES = 40;
-	final static int NB_GENOMES = 40;
-	final static int NB_POPULATIONS = 140;
-	final static int KEEP_TOURNAMENT_WINNER_PERCENTAGE = 90;
+	final static int NB_GENES = 80;
+	final static int NB_GENOMES = 20;
+	final static int NB_POPULATIONS = 100;
+	final static int KEEP_TOURNAMENT_WINNER_PERCENTAGE = 95;
 	final static int MUTATION_PERCENTAGE = 3;
-	final static int MUTED_GENES_PER_MUTATION = 3;
-	final static int[] rotations = {0};
-	final static int[] powers = {0, 4, 4};
+	final static int MUTED_GENES_PER_MUTATION = 6;
+	final static int[] rotations = {-90, 0, 0, 90};
+	final static int[] powers = {0, 4, 4, 4};
 	final static Random rand = new Random();
 
 	// Population objects
@@ -84,18 +84,19 @@ class Player {
         		ship = new Ship(x, y, hSpeed, vSpeed, fuel, rotate, power);
         	}
         	
-        	log("Vspeed = " + ship.vSpeed);
-        	log("Y = " + ship.y);
+            log("Hspeed = " + ship.hSpeed + " " + "Vspeed = " + ship.vSpeed);
+        	log("X = " + ship.x + " Y = " + ship.y);
         	log("Fuel = " + ship.fuel);
+        	log("Angle = " + ship.rotate);
         	
     		// Genetic model
         	createPopulation();
         	for (int i = 0; i < Player.NB_POPULATIONS; i++) {
-	
+        		
         		selectPopulationByTournament();
         		completeNextPopulation();
             	mutateNextPopulation();
-        		
+            	
         		HashSet<Genome> tempPopulation = population;
         		population = nextPopulation;
         		nextPopulation = tempPopulation;
@@ -103,11 +104,11 @@ class Player {
         	}
 
         	// Get the best genome in the final population for playing
+        	evaluatePopulation();
         	Genome bestGenome = selectBestGenome();
         	Gene gene = bestGenome.getFirstGene();
         	move(gene.rotation, gene.power, true);
-            play(gene.rotation, gene.power);
-            
+        	play(ship.rotate, gene.power);
         	log("Best evaluation = " + bestGenome.evaluation);
         	log("Nb turn to land = " + bestGenome.nbTurnToLand);
         	log("World " + bestGenome.endX + " " + bestGenome.endY);
@@ -123,15 +124,25 @@ class Player {
     	System.out.println(rotation + " " + power);
     }
     
+    public static void evaluatePopulation() {
+    	for (Genome genome:population) {
+    		genome.evaluate();
+    	}
+    }
+    
     public static Genome selectBestGenome() {
 
     	Genome bestGenome = null;
     	int bestEvaluation = -1;
+    	boolean areAllCrashed = true;
     	
     	for (Genome genome:population) {
     		if (genome.evaluation > bestEvaluation) {
     			bestEvaluation = genome.evaluation;
     			bestGenome = genome;
+    		}
+    		if (!genome.isCrashed) {
+    			areAllCrashed = false;
     		}
     	}
     	
@@ -143,7 +154,7 @@ class Player {
     	for (Genome genome:nextPopulation) {
     		if (rand.nextInt(100) < MUTATION_PERCENTAGE) {
     			for (int i = 0; i < MUTED_GENES_PER_MUTATION; i++) {
-    				genome.replaceGene(rand.nextInt(NB_GENES));
+    				genome.replaceGene(rand.nextInt(Math.min(NB_GENES, genome.nbTurnToLand+1)));
     			}
     		}
     	}
@@ -191,10 +202,8 @@ class Player {
     	Genome previousGenome = null;
     	
     	for (Genome genome:population) {
-    		if (numGenome%2 == 1) {
-    			previousGenome.evaluate();
-    			genome.evaluate();
-    			
+    		genome.evaluate();
+    		if (numGenome%2 == 1) {    			
     			Genome bestGenome;
     			Genome worstGenome;
     			if (genome.evaluation >= previousGenome.evaluation) {
@@ -230,27 +239,38 @@ class Player {
 		rotate = Math.min(Math.max(rotate, MIN_ANGLE), MAX_ANGLE);
 		ship.rotate = rotate;
 		
+		double forceY = - G + (double)ship.power * Math.cos(Math.toRadians(ship.rotate));
+		double forceX = - (double)ship.power * Math.sin(Math.toRadians(ship.rotate));
+				
 		// New vertical location
 		double startY = ship.y;
-		ship.y += (- G + (double)ship.power) / 2 + ship.vSpeed;
+		ship.y += forceY / 2 + ship.vSpeed;
 		double endY = ship.y;
 		
 		// Vertical speed calculation
-		ship.vSpeed = ship.vSpeed - G + (double)ship.power;
+		ship.vSpeed = ship.vSpeed + forceY;
 		ship.vSpeed = Math.min(Math.max(ship.vSpeed, MIN_SPEED), MAX_SPEED);
-				
+		
+		// New horizontal location
+		double startX = ship.x;
+		ship.x += forceX / 2 + ship.hSpeed;
+		double endX = ship.x;
+		
+		ship.hSpeed = ship.hSpeed + forceX;
+		ship.hSpeed = Math.min(Math.max(ship.hSpeed, MIN_SPEED), MAX_SPEED);
+		
 		// Check obstacles
-		checkEndOfMap(endY);
-		checkObstacles(ship.x, startY, ship.x, endY);
-		checkLanding(ship.x, startY, ship.x, endY, audit);
+		checkEndOfMap(endX, endY);
+		checkObstacles(startX, startY, endX, endY);
+		checkLanding(startX, startY, endX, endY, audit);
 		
 		// Update properties
 		ship.fuel -= power;
 	}
 	
-	public static void checkEndOfMap(double endY) {
+	public static void checkEndOfMap(double endX, double endY) {
 		
-		if (endY < 0 || endY >= world.y) {
+		if (endY < 0 || endY >= world.y || endX < 0 || endX >= world.x) {
 			ship.crash();
 		}
 	}
@@ -286,8 +306,21 @@ class Player {
 		int distance = 0;
 		Segment landSegment = world.landSegment;
 		if (landSegment == null) { return -1; }
-		distance = (int)((Math.abs(landSegment.a * ship.x - ship.y + landSegment.b)) / Math.sqrt(Math.pow(landSegment.a, 2) + Math.pow(-1, 2)));
-		//distance = (int)Math.sqrt(Math.pow(landSegment.startX - ship.x, 2) + Math.pow(landSegment.startY - ship.y, 2));
+
+		if (ship.x < landSegment.startX + 50) {
+			distance = (int)Math.sqrt(Math.pow(landSegment.startX + 50 - ship.x, 2) + Math.pow(ship.y - ship.y, 2));
+		}
+		else if (ship.x > landSegment.endX - 50) {
+			distance = (int)Math.sqrt(Math.pow(landSegment.endX - 50 - ship.x, 2) + Math.pow(ship.y - ship.y, 2));
+		}
+		else {
+			distance = (int)((Math.abs(landSegment.a * ship.x - ship.y + landSegment.b)) / Math.sqrt(Math.pow(landSegment.a, 2) + Math.pow(-1, 2)));
+		}
+		
+		// Penalty if lower than target
+		if (ship.y < landSegment.startY) {
+			distance += 50 * (landSegment.startY - ship.y);
+		}
 		return distance;
 	}
 }
@@ -300,6 +333,7 @@ class Genome {
 	double endX = 0;
 	double endY = 0;
 	double vSpeed = 0;
+	boolean isCrashed;
 	
 	Genome() {
 	}
@@ -307,7 +341,7 @@ class Genome {
 	void evaluate() {
 		
 		Ship backupShip = Player.ship.clone();
-		int evaluation = 0;
+		int evaluation = 1000000;
 		nbTurnToLand = 0;
 		
 		for (Gene gene:genes) {
@@ -316,18 +350,22 @@ class Genome {
 			nbTurnToLand++;
 		}
 		
-		// If ship is crashed
-		if (Player.ship.isCrashed) {
-			evaluation = 0;
-		}
 		// If ship is landed
-		else if (Player.ship.isLanded) {
-			evaluation = 1000000 + Player.ship.fuel;
+		if (Player.ship.isLanded) {
+			evaluation += Player.ship.fuel;
 		}
 		else {
-			evaluation = 100000 - Player.getDistanceFromShipToTarget();
-			if (Player.ship.vSpeed > Player.MAX_VSPEED_TO_LAND) {
-				evaluation += 1000 * (Player.MAX_VSPEED_TO_LAND - Player.ship.vSpeed);
+			
+			// Respect arrival conditions in priority
+			evaluation -= 10000 * (int)Math.max(Math.abs(Player.ship.hSpeed) - Player.MAX_HSPEED_TO_LAND,0);
+			evaluation -= 10000 * (int)Math.max(Math.abs(Player.ship.vSpeed) - Player.MAX_VSPEED_TO_LAND,0);
+			
+			// Then better distance
+			evaluation -= Player.getDistanceFromShipToTarget();
+			
+			// Penalty if crashed
+			if (Player.ship.isCrashed) {
+				evaluation -= 500000;
 			}
 		}
 		
@@ -335,6 +373,7 @@ class Genome {
 		this.endX = Player.ship.x;
 		this.endY = Player.ship.y;
 		this.vSpeed = Player.ship.vSpeed;
+		this.isCrashed = Player.ship.isCrashed;
 		Player.ship = backupShip;
 	}
 	

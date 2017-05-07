@@ -5,47 +5,32 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 public class PlayerTest {
-
-	/**
-	 * Test a full scenario with one move only
-	 */
-	@Test
-	@Ignore
-	public void testPhysicalEngineFirstScenario(){
-		Ship ship = createInitialShip();
-		
-		this.move(-45, Player.MAX_POWER);
-		
-		Assert.assertEquals("Horizontal value is wrong", 4950, ship.x, 0);
-		Assert.assertEquals("Vertical value is wrong", 2498, ship.y, 0);
-		Assert.assertEquals("hSpeed value is wrong", -51, ship.hSpeed, 0);
-		Assert.assertEquals("vSpeed value is wrong", -3, ship.vSpeed, 0);
-		Assert.assertEquals("Fuel value is wrong", 999, ship.fuel);
-		Assert.assertEquals("Rotate value is wrong", 75, ship.rotate);
-		Assert.assertEquals("Power value is wrong", 1, ship.power);
-	}
 	
 	@Test
-	@Ignore
 	public void testPhysicalEngineThirdScenario(){
-		Ship ship = new Ship();
+		Ship ship = createInitialShip();
 		ship.x = 2500;
-		ship.y = 2499;
-		ship.hSpeed = -0;
-		ship.vSpeed = -3;
-		ship.fuel = 499;
+		ship.y = 2700;
+		ship.hSpeed = 0;
+		ship.vSpeed = 0;
+		ship.fuel = 550;
 		ship.rotate = 0;
-		ship.power = 1;
+		ship.power = 0;
 		
-		this.move(0, 3);
+		this.move(-90, 0);
+		this.move(-90, 0);
+		this.move(-90, 4);
+		this.move(90, 4);
+		this.move(90, 4);
+		this.move(0, 4);
 		
-		Assert.assertEquals("Horizontal value is wrong", 2500, ship.x, 0);
-		Assert.assertEquals("Vertical value is wrong", 2495, ship.y, 0);
-		Assert.assertEquals("hSpeed value is wrong", 0, ship.hSpeed, 0);
-		Assert.assertEquals("vSpeed value is wrong", -4, ship.vSpeed, 0);
-		Assert.assertEquals("Fuel value is wrong", 497, ship.fuel);
-		Assert.assertEquals("Rotate value is wrong", 0, ship.rotate);
-		Assert.assertEquals("Power value is wrong", 2, ship.power);
+		Assert.assertEquals("Horizontal value is wrong", 2506.657, ship.x, 0.001);
+		Assert.assertEquals("Vertical value is wrong", 2646.285, ship.y, 0.001);
+		Assert.assertEquals("hSpeed value is wrong", 3.518, ship.hSpeed, 0.001);
+		Assert.assertEquals("vSpeed value is wrong", -13.065, ship.vSpeed, 0.001);
+		Assert.assertEquals("Fuel value is wrong", 540, ship.fuel);
+		Assert.assertEquals("Rotate value is wrong", -15, ship.rotate);
+		Assert.assertEquals("Power value is wrong", 4, ship.power);
 	}
 	
 	/**
@@ -289,7 +274,7 @@ public class PlayerTest {
 	@Test
 	public void testShipNotLandWhenAngleIsNotCorrect() {
 		Ship ship = createInitialShip();
-		ship.rotate = 15;
+		ship.rotate = 75;
 		ship.hSpeed = 0;
 		Player.world.addSegment(3990, 2499,  6010,  2499);
 		
