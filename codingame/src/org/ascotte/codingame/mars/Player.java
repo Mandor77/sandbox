@@ -35,8 +35,8 @@ class Player {
 	final static World world = new World(MAX_X, MAX_Y);
 	
 	// Genetic model parameters
-	final static int NB_GENES = 80;
-	final static int NB_GENOMES = 20;
+	final static int NB_GENES = 50;
+	final static int NB_GENOMES = 36;
 	final static int NB_POPULATIONS = 100;
 	final static int KEEP_TOURNAMENT_WINNER_PERCENTAGE = 95;
 	final static int MUTATION_PERCENTAGE = 3;
@@ -105,6 +105,7 @@ class Player {
 
         	// Get the best genome in the final population for playing
         	evaluatePopulation();
+        	
         	Genome bestGenome = selectBestGenome();
         	Gene gene = bestGenome.getFirstGene();
         	move(gene.rotation, gene.power, true);
@@ -309,9 +310,43 @@ class Player {
 
 		if (ship.x < landSegment.startX + 50) {
 			distance = (int)Math.sqrt(Math.pow(landSegment.startX + 50 - ship.x, 2) + Math.pow(ship.y - ship.y, 2));
+			
+			// Penalty if lower than a pic between ship and target
+			double maxY = 0;
+			for (Segment worldSegment:world.crashSegments) {
+				if (ship.x < landSegment.startX && ship.x < worldSegment.endX && worldSegment.endX < landSegment.endX) {
+					if (worldSegment.startY > maxY) {
+						maxY = worldSegment.startY;
+					}
+					if (worldSegment.endY > maxY) {
+						maxY = worldSegment.endY;
+					} 
+				}
+			}
+			if (ship.y < maxY) {
+				distance += 50 * (maxY - ship.y);
+			}
+			
 		}
 		else if (ship.x > landSegment.endX - 50) {
 			distance = (int)Math.sqrt(Math.pow(landSegment.endX - 50 - ship.x, 2) + Math.pow(ship.y - ship.y, 2));
+		
+			// Penalty if lower than a pic between ship and target
+			double maxY = 0;
+			for (Segment worldSegment:world.crashSegments) {
+				if (ship.x > landSegment.endX && ship.x > worldSegment.startX && worldSegment.startX > landSegment.startX) {
+					if (worldSegment.startY > maxY) {
+						maxY = worldSegment.startY;
+					}
+					if (worldSegment.endY > maxY) {
+						maxY = worldSegment.endY;
+					} 
+				}
+			}
+			if (ship.y < maxY) {
+				distance += 50 * (maxY - ship.y);
+			}
+			
 		}
 		else {
 			distance = (int)((Math.abs(landSegment.a * ship.x - ship.y + landSegment.b)) / Math.sqrt(Math.pow(landSegment.a, 2) + Math.pow(-1, 2)));
@@ -321,6 +356,7 @@ class Player {
 		if (ship.y < landSegment.startY) {
 			distance += 50 * (landSegment.startY - ship.y);
 		}
+		
 		return distance;
 	}
 }
@@ -329,6 +365,7 @@ class Genome {
 	
 	ArrayList<Gene> genes = new ArrayList<Gene>();
 	int evaluation = 0;
+	int evaluationTop = 0;
 	int nbTurnToLand = 0;
 	double endX = 0;
 	double endY = 0;
