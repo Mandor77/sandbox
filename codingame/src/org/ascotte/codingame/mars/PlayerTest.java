@@ -16,8 +16,8 @@ public class PlayerTest {
 		
 		this.move(-45, Player.MAX_POWER);
 		
-		Assert.assertEquals("Horizontal value is wrong", 4950, ship.position.x);
-		Assert.assertEquals("Vertical value is wrong", 2498, ship.position.y);
+		Assert.assertEquals("Horizontal value is wrong", 4950, ship.x, 0);
+		Assert.assertEquals("Vertical value is wrong", 2498, ship.y, 0);
 		Assert.assertEquals("hSpeed value is wrong", -51, ship.hSpeed, 0);
 		Assert.assertEquals("vSpeed value is wrong", -3, ship.vSpeed, 0);
 		Assert.assertEquals("Fuel value is wrong", 999, ship.fuel);
@@ -29,9 +29,8 @@ public class PlayerTest {
 	@Ignore
 	public void testPhysicalEngineThirdScenario(){
 		Ship ship = new Ship();
-		ship.position = new Position();
-		ship.position.x = 2500;
-		ship.position.y = 2499;
+		ship.x = 2500;
+		ship.y = 2499;
 		ship.hSpeed = -0;
 		ship.vSpeed = -3;
 		ship.fuel = 499;
@@ -40,8 +39,8 @@ public class PlayerTest {
 		
 		this.move(0, 3);
 		
-		Assert.assertEquals("Horizontal value is wrong", 2500, ship.position.x);
-		Assert.assertEquals("Vertical value is wrong", 2495, ship.position.y);
+		Assert.assertEquals("Horizontal value is wrong", 2500, ship.x, 0);
+		Assert.assertEquals("Vertical value is wrong", 2495, ship.y, 0);
 		Assert.assertEquals("hSpeed value is wrong", 0, ship.hSpeed, 0);
 		Assert.assertEquals("vSpeed value is wrong", -4, ship.vSpeed, 0);
 		Assert.assertEquals("Fuel value is wrong", 497, ship.fuel);
@@ -59,8 +58,8 @@ public class PlayerTest {
 		this.move(-45, Player.MAX_POWER);
 		this.move(-45, Player.MAX_POWER);
 		
-		Assert.assertEquals("Horizontal value is wrong", 4898, ship.position.x);
-		Assert.assertEquals("Vertical value is wrong", 2493, ship.position.y);
+		Assert.assertEquals("Horizontal value is wrong", 4898, ship.x, 0);
+		Assert.assertEquals("Vertical value is wrong", 2493, ship.y, 0);
 		Assert.assertEquals("hSpeed value is wrong", -53, ship.hSpeed, 0);
 		Assert.assertEquals("vSpeed value is wrong", -6, ship.vSpeed, 0);
 		Assert.assertEquals("Fuel value is wrong", 997, ship.fuel);
@@ -241,14 +240,17 @@ public class PlayerTest {
 		Ship ship = createInitialShip();
 		ship.rotate = 0;
 		ship.hSpeed = 0;
-		ship.vSpeed = -6;
-		double initialPositionY = ship.position.y;
-		double initialVSpeed = ship.vSpeed;
+		ship.vSpeed = 0;
+
+		this.move(0, 4);
+		this.move(0, 4);
 		this.move(0, 0);
+		this.move(0, 4);
+		this.move(0, 4);
 		this.move(0, 0);
 		
-		Assert.assertEquals("Speed with only gravity is not correct", initialVSpeed + Player.G * -2, ship.vSpeed, 0);
-		Assert.assertEquals("Position with only gravity is not correct", initialPositionY + initialVSpeed + Player.G * -1 + initialVSpeed + Player.G * -2, ship.position.y, 0);
+		Assert.assertEquals("Speed with only gravity is not correct", -11.266, ship.vSpeed, 0.001);
+		Assert.assertEquals("Position with only gravity is not correct", 2461.702, ship.y, 0.001);
 	}
 	
 	/**
@@ -259,7 +261,7 @@ public class PlayerTest {
 		Ship ship = createInitialShip();
 		ship.rotate = 0;
 		ship.hSpeed = 0;
-		Player.world.addCrashSegment(4990, 2499,  5010,  2499);
+		Player.world.addSegment(4990, 2499,  5010,  2499);
 		
 		this.move(0, 0);
 		
@@ -274,7 +276,7 @@ public class PlayerTest {
 		Ship ship = createInitialShip();
 		ship.rotate = 0;
 		ship.hSpeed = 0;
-		Player.world.addLandSegment(4990, 2499,  5010,  2499);
+		Player.world.addSegment(3990, 2499,  6010,  2499);
 		
 		this.move(0, 0);
 		
@@ -289,7 +291,7 @@ public class PlayerTest {
 		Ship ship = createInitialShip();
 		ship.rotate = 15;
 		ship.hSpeed = 0;
-		Player.world.addLandSegment(4990, 2499,  5010,  2499);
+		Player.world.addSegment(3990, 2499,  6010,  2499);
 		
 		this.move(0, 0);
 		
@@ -305,7 +307,7 @@ public class PlayerTest {
 		Ship ship = createInitialShip();
 		ship.rotate = 0;
 		ship.hSpeed = Player.MAX_HSPEED_TO_LAND+1;
-		Player.world.addLandSegment(4990, 2499,  5010,  2499);
+		Player.world.addSegment(3990, 2499,  6010,  2499);
 		
 		this.move(0, 0);
 		
@@ -322,7 +324,7 @@ public class PlayerTest {
 		ship.rotate = 0;
 		ship.hSpeed = 0;
 		ship.vSpeed = -Player.MAX_VSPEED_TO_LAND-1;
-		Player.world.addLandSegment(4990, 2499,  5010,  2499);
+		Player.world.addSegment(3990, 2499,  6010,  2499);
 		
 		this.move(0, 0);
 		
@@ -336,7 +338,7 @@ public class PlayerTest {
 	@Test
 	public void testShipCrashWhenOutsideVerticalMap() {
 		Ship ship = createInitialShip();
-		ship.position.y = 50;
+		ship.y = 50;
 		ship.vSpeed = -100;
 		
 		this.move(0, Player.MAX_POWER);
@@ -396,21 +398,45 @@ public class PlayerTest {
 		Assert.assertEquals("Segments should have intersection", true, haveIntersection);
 	}
 	
+	/**
+	 * Test than vertical segment have no intersection with another segment
+	 */
+	@Test
+	public void testVerticalSegmentHaveNoIntersectionWithOtherSegment() {
+		Segment segment1 = new Segment(200, 300, 200, 150);
+		Segment segment2 = new Segment(150, 120, 250, 100);
+		
+		boolean haveIntersection = Segment.checkIntersection(segment1, segment2);
+		
+		Assert.assertEquals("Segments should have intersection", false, haveIntersection);
+	}
+	
+	/**
+	 * Test than vertical segment have no intersection with another segment
+	 */
+	@Test
+	public void testPerso() {
+		Segment segment1 = new Segment(2500, 1238.3556000000005, 2500.0, 1298.8186000000005);
+		Segment segment2 = new Segment(1.0, 1.0, 1000.0, 500.0);
+		
+		boolean haveIntersection = Segment.checkIntersection(segment1, segment2);
+		
+		Assert.assertEquals("Segments should have intersection", false, haveIntersection);
+	}
+	
 	public Ship createInitialShip() {
-		Ship ship = new Ship();
-		Player.ship = ship;
-		ship.position = new Position();
-		ship.position.x = 5000;
-		ship.position.y = 2500;
-		ship.hSpeed = -50;
-		ship.vSpeed = 0;
-		ship.fuel = 1000;
-		ship.rotate = 90;
-		ship.power = 0;
-		return ship;
+		Player.ship = new Ship();
+		Player.ship.x = 5000;
+		Player.ship.y = 2500;
+		Player.ship.hSpeed = -50;
+		Player.ship.vSpeed = 0;
+		Player.ship.fuel = 1000;
+		Player.ship.rotate = 90;
+		Player.ship.power = 0;
+		return Player.ship;
 	}
 	
 	public void move(int rotate, int power) {
-			Player.move(rotate, power);
+			Player.move(rotate, power, false);
 	}
 }

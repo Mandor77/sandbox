@@ -1,4 +1,5 @@
 package org.ascotte.codingame.mars;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Random;
@@ -10,34 +11,43 @@ import java.util.Scanner;
  **/
 class Player {
 
-	static Ship ship = new Ship();
-	static int MAX_POWER = 4;
-	static int MIN_POWER = 0;
-	static int MAX_ROTATION = 15;
-	static int MIN_ROTATION = -15;
-	static int MAX_ANGLE = 90;
-	static int MIN_ANGLE = -90;
-	static int MAX_SPEED = 500;
-	static int MIN_SPEED = -500;
-	static int MIN_X = 0;
-	static int MAX_X = 7000;
-	static int MIN_Y = 0;
-	static int MAX_Y = 3000;
-	static int MAX_VSPEED_TO_LAND = 40;
-	static int MAX_HSPEED_TO_LAND = 20;	
-	static double G = 3.711;
+	// Engine constants
+	final static int MAX_POWER = 4;
+	final static int MIN_POWER = 0;
+	final static int MAX_ROTATION = 15;
+	final static int MIN_ROTATION = -15;
+	final static int MAX_ANGLE = 90;
+	final static int MIN_ANGLE = -90;
+	final static int MAX_SPEED = 500;
+	final static int MIN_SPEED = -500;
+	final static int MIN_X = 0;
+	final static int MAX_X = 7000;
+	final static int MIN_Y = 0;
+	final static int MAX_Y = 3000;
+	final static int MAX_VSPEED_TO_LAND = 40;
+	final static int MAX_HSPEED_TO_LAND = 20;	
 	
-	// Genetic model
-	static int NB_GENES = 80;
-	static int NB_INDIVIDUS = 20;
-	static int[] rotations = {0};
-	static int[] powers = {0, 4, 4};
-	static int MAX_GENERATIONS = 10;
+	// Physic constants
+	final static double G = 3.711;
 	
-	static World world = new World(MAX_X, MAX_Y);
+	// Engine objects
+	static Ship ship = null;
+	final static World world = new World(MAX_X, MAX_Y);
 	
-	static HashSet<Individu> population = new HashSet<Individu>();
-	static HashSet<Individu> nextPopulation = new HashSet<Individu>();
+	// Genetic model parameters
+	final static int NB_GENES = 40;
+	final static int NB_GENOMES = 40;
+	final static int NB_POPULATIONS = 140;
+	final static int KEEP_TOURNAMENT_WINNER_PERCENTAGE = 90;
+	final static int MUTATION_PERCENTAGE = 3;
+	final static int MUTED_GENES_PER_MUTATION = 3;
+	final static int[] rotations = {0};
+	final static int[] powers = {0, 4, 4};
+	final static Random rand = new Random();
+
+	// Population objects
+	static HashSet<Genome> population = new HashSet<Genome>();
+	static HashSet<Genome> nextPopulation = new HashSet<Genome>();
 	
     public static void main(String args[]) {
        
@@ -51,140 +61,190 @@ class Player {
         	int landX = in.nextInt(); // X coordinate of a surface point. (0 to 6999)
             int landY = in.nextInt(); // Y coordinate of a surface point. By linking all the points together in a sequential fashion, you form the surface of Mars.
             
-            if (i == 0) { continue; }
-            else {
-            	if(landY == previousLandY) {
-            		world.addCrashSegment(previousLandX, previousLandY, landX, landY);
-            	}
-            	else {
-            		world.addLandSegment(previousLandX, previousLandY, landX, landY);
-            	}
-            	
+            if (i != 0) {
+            	world.addSegment(previousLandX, previousLandY, landX, landY);
             }
             
             previousLandX = landX;
             previousLandY = landY;
         }
 
-    	
-    	
         // game loop
         while (true) {
-            /*ship.position.x = in.nextInt();
-            ship.position.y = in.nextInt();
-            ship.hSpeed = in.nextInt(); // the horizontal speed (in m/s), can be negative.
-            ship.vSpeed = in.nextInt(); // the vertical speed (in m/s), can be negative.
-            ship.fuel = in.nextInt(); // the quantity of remaining fuel in liters.
-            ship.rotate = in.nextInt(); // the rotation angle in degrees (-90 to 90).
-            ship.power = in.nextInt(); // the thrust power (0 to 4).
-             */
-
-        	for (int i = 0; i < Player.MAX_GENERATIONS; i++) {
-        		// Create population
-        		createPopulation();
         	
-        		// Select best population
+        	int x = in.nextInt();
+            int y = in.nextInt();
+            int hSpeed = in.nextInt(); // the horizontal speed (in m/s), can be negative.
+            int vSpeed = in.nextInt(); // the vertical speed (in m/s), can be negative.
+            int fuel = in.nextInt(); // the quantity of remaining fuel in liters.
+            int rotate = in.nextInt(); // the rotation angle in degrees (-90 to 90).
+            int power = in.nextInt(); // the thrust power (0 to 4).
+        	
+            if (ship == null) {
+        		ship = new Ship(x, y, hSpeed, vSpeed, fuel, rotate, power);
+        	}
+        	
+        	log("Vspeed = " + ship.vSpeed);
+        	log("Y = " + ship.y);
+        	log("Fuel = " + ship.fuel);
+        	
+    		// Genetic model
+        	createPopulation();
+        	for (int i = 0; i < Player.NB_POPULATIONS; i++) {
+	
         		selectPopulationByTournament();
-        	
-        		// Complete population
         		completeNextPopulation();
+            	mutateNextPopulation();
         		
-            	// Mutate population
-            	//mutatePopulation(population);
-        		
-        		HashSet<Individu> tempPopulation = population;
+        		HashSet<Genome> tempPopulation = population;
         		population = nextPopulation;
         		nextPopulation = tempPopulation;
         		nextPopulation.clear();
         	}
-        	
-        	Individu bestIndividu = selectBestIndividu();
-        	
-            // rotate power. rotate is the desired rotation angle. power is the desired thrust power.
-        	System.err.println("Best evaluation = " + bestIndividu.evaluation);
-            System.out.println(bestIndividu.getFirstGene().rotation + " " + bestIndividu.getFirstGene().power);
+
+        	// Get the best genome in the final population for playing
+        	Genome bestGenome = selectBestGenome();
+        	Gene gene = bestGenome.getFirstGene();
+        	move(gene.rotation, gene.power, true);
+            play(gene.rotation, gene.power);
+            
+        	log("Best evaluation = " + bestGenome.evaluation);
+        	log("Nb turn to land = " + bestGenome.nbTurnToLand);
+        	log("World " + bestGenome.endX + " " + bestGenome.endY);
+            population.clear();
         }
     }
     
-    public static Individu selectBestIndividu() {
-    	Individu bestIndividu = null;
+    public static void log(String message) {
+    	System.err.println(message);
+    }
+    
+    public static void play(int rotation, int power) {
+    	System.out.println(rotation + " " + power);
+    }
+    
+    public static Genome selectBestGenome() {
+
+    	Genome bestGenome = null;
     	int bestEvaluation = -1;
     	
-    	for (Individu individu:population) {
-    		if (individu.evaluation > bestEvaluation) {
-    			bestEvaluation = individu.evaluation;
-    			bestIndividu = individu;
+    	for (Genome genome:population) {
+    		if (genome.evaluation > bestEvaluation) {
+    			bestEvaluation = genome.evaluation;
+    			bestGenome = genome;
     		}
     	}
     	
-    	return bestIndividu;
+    	return bestGenome;
     }
     
-    
-    public static void completeNextPopulation() {
-    	for (int i = nextPopulation.size(); i < NB_INDIVIDUS; i++) {
-    		Individu individu = new Individu();
-    		individu.generateRandomGenes();
-    		nextPopulation.add(individu);
+    public static void mutateNextPopulation() {
+    	
+    	for (Genome genome:nextPopulation) {
+    		if (rand.nextInt(100) < MUTATION_PERCENTAGE) {
+    			for (int i = 0; i < MUTED_GENES_PER_MUTATION; i++) {
+    				genome.replaceGene(rand.nextInt(NB_GENES));
+    			}
+    		}
     	}
     }
     
+    public static void completeNextPopulation() {
+    	int numGenome = 0;
+    	Genome previousGenome = null;
+    	HashSet<Genome> childs = new HashSet<Genome>();
+    	
+    	for (Genome genome:nextPopulation) {
+    		if (numGenome%2 == 1) {
+    			int split = rand.nextInt(NB_GENES);
+    			Genome child1 = new Genome();
+    			child1.copyGenes(genome, 0, split);
+    			child1.copyGenes(previousGenome, split, NB_GENES);
+    			Genome child2 = new Genome();
+    			child2.copyGenes(previousGenome, 0, split);
+    			child2.copyGenes(genome, split, NB_GENES);
+    			childs.add(child1);
+    			childs.add(child2);
+    		}
+    		
+    		previousGenome = genome;
+    		numGenome++;
+    	}
+    	
+		nextPopulation.addAll(childs);
+
+    	Genome genome = new Genome();
+    	genome.generateRandomGenes();
+    	nextPopulation.add(genome);
+    }
+    
     public static void createPopulation() {
-    	for (int i = 0; i < NB_INDIVIDUS; i++) {
-    		Individu individu = new Individu();
-    		individu.generateRandomGenes();
-    		population.add(individu);
+    	for (int i = 0; i < NB_GENOMES; i++) {
+    		Genome genome = new Genome();
+    		genome.generateRandomGenes();
+    		population.add(genome);
     	}
     }
 
     public static void selectPopulationByTournament() {
-    	int numIndividu = 0;
-    	Individu previousIndividu = null;
+    	int numGenome = 0;
+    	Genome previousGenome = null;
     	
-    	for (Individu individu:population) {
-    		// Launch the battle
-    		if (numIndividu%2 == 1) {
-    			individu.evaluate();
-    			previousIndividu.evaluate();
-    			if (individu.evaluation >= previousIndividu.evaluation) {
-    				nextPopulation.add(individu);
+    	for (Genome genome:population) {
+    		if (numGenome%2 == 1) {
+    			previousGenome.evaluate();
+    			genome.evaluate();
+    			
+    			Genome bestGenome;
+    			Genome worstGenome;
+    			if (genome.evaluation >= previousGenome.evaluation) {
+    				bestGenome = genome;
+    				worstGenome = previousGenome;
     			} else {
-    				nextPopulation.add(previousIndividu);
+    				bestGenome = previousGenome;
+    				worstGenome = genome;
+    			}
+    			
+    			if (rand.nextInt(100) < KEEP_TOURNAMENT_WINNER_PERCENTAGE) {
+    				nextPopulation.add(bestGenome);
+    			}
+    			else {
+    				nextPopulation.add(worstGenome);
     			}
     		}
     		
-    		previousIndividu = individu;
-    		numIndividu++;
+    		previousGenome = genome;
+    		numGenome++;
     	}
     }
     
-	public static void move(int rotate, int power) {
+	public static void move(int rotate, int power, boolean audit) {
 
 		// Power calculation
 		power = ship.power + Integer.signum(power-ship.power);
 		power = Math.min(Math.max(power, MIN_POWER), MAX_POWER);
+		ship.power = power;
 		
 		// Rotation calculation
 		rotate = ship.rotate + (Math.min(Math.abs(rotate), MAX_ROTATION)) * Integer.signum(rotate);
 		rotate = Math.min(Math.max(rotate, MIN_ANGLE), MAX_ANGLE);
+		ship.rotate = rotate;
+		
+		// New vertical location
+		double startY = ship.y;
+		ship.y += (- G + (double)ship.power) / 2 + ship.vSpeed;
+		double endY = ship.y;
 		
 		// Vertical speed calculation
 		ship.vSpeed = ship.vSpeed - G + (double)ship.power;
 		ship.vSpeed = Math.min(Math.max(ship.vSpeed, MIN_SPEED), MAX_SPEED);
-		
-		// New vertical location
-		double startY = ship.position.y;
-		ship.position.y += ship.vSpeed;
-		double endY = ship.position.y;
-		
+				
 		// Check obstacles
 		checkEndOfMap(endY);
-		checkObstacles(ship.position.x, startY, ship.position.x, endY);
-		checkLanding(ship.position.x, startY, ship.position.x, endY);
+		checkObstacles(ship.x, startY, ship.x, endY);
+		checkLanding(ship.x, startY, ship.x, endY, audit);
 		
 		// Update properties
-		ship.power = power;
-		ship.rotate = rotate;
 		ship.fuel -= power;
 	}
 	
@@ -206,19 +266,17 @@ class Player {
 		}
 	}
 	
-	public static void checkLanding(double startX, double startY, double endX, double endY) {
-		
+	public static void checkLanding(double startX, double startY, double endX, double endY, boolean audit) {
+
 		Segment shipSegment = new Segment(startX, startY, endX, endY);
-		
-		for (Segment worldSegment:world.landSegments) {
-			if (Segment.checkIntersection(shipSegment, worldSegment)){
-				if (ship.rotate == 0 && Math.abs(ship.hSpeed) < MAX_HSPEED_TO_LAND &&
-						Math.abs(ship.vSpeed) < MAX_VSPEED_TO_LAND) {
-							ship.land();	
-				}
-				else {
-					ship.crash();
-				}
+		Segment landSegment = world.landSegment;
+		if (landSegment == null) {return;}
+		if (Segment.checkIntersection(shipSegment, landSegment)) {
+			if (ship.rotate == 0 && Math.abs(ship.hSpeed) < MAX_HSPEED_TO_LAND
+					&& Math.abs(ship.vSpeed) < MAX_VSPEED_TO_LAND) {
+				ship.land();
+			} else {
+				ship.crash();
 			}
 		}
 	}
@@ -226,28 +284,36 @@ class Player {
 	public static int getDistanceFromShipToTarget() {
 		
 		int distance = 0;
-		for (Segment worldSegment:world.landSegments) {
-			distance += Math.sqrt(Math.pow(worldSegment.startX - ship.position.x, 2) + Math.pow(worldSegment.startY - ship.position.y, 2));
-		}
+		Segment landSegment = world.landSegment;
+		if (landSegment == null) { return -1; }
+		distance = (int)((Math.abs(landSegment.a * ship.x - ship.y + landSegment.b)) / Math.sqrt(Math.pow(landSegment.a, 2) + Math.pow(-1, 2)));
+		//distance = (int)Math.sqrt(Math.pow(landSegment.startX - ship.x, 2) + Math.pow(landSegment.startY - ship.y, 2));
 		return distance;
 	}
 }
 
-class Individu {
-	LinkedList<Gene> genes = new LinkedList<Gene>();
-	int evaluation = 0;
+class Genome {
 	
-	Individu() {
+	ArrayList<Gene> genes = new ArrayList<Gene>();
+	int evaluation = 0;
+	int nbTurnToLand = 0;
+	double endX = 0;
+	double endY = 0;
+	double vSpeed = 0;
+	
+	Genome() {
 	}
 	
 	void evaluate() {
 		
 		Ship backupShip = Player.ship.clone();
 		int evaluation = 0;
+		nbTurnToLand = 0;
 		
 		for (Gene gene:genes) {
 			if (Player.ship.isCrashed || Player.ship.isLanded) { break;}
-			Player.move(gene.rotation, gene.power);
+			Player.move(gene.rotation, gene.power, false);
+			nbTurnToLand++;
 		}
 		
 		// If ship is crashed
@@ -256,24 +322,39 @@ class Individu {
 		}
 		// If ship is landed
 		else if (Player.ship.isLanded) {
-			evaluation = 10000;
+			evaluation = 1000000 + Player.ship.fuel;
 		}
 		else {
-			evaluation = Player.getDistanceFromShipToTarget();
+			evaluation = 100000 - Player.getDistanceFromShipToTarget();
+			if (Player.ship.vSpeed > Player.MAX_VSPEED_TO_LAND) {
+				evaluation += 1000 * (Player.MAX_VSPEED_TO_LAND - Player.ship.vSpeed);
+			}
 		}
 		
 		this.evaluation = evaluation;
+		this.endX = Player.ship.x;
+		this.endY = Player.ship.y;
+		this.vSpeed = Player.ship.vSpeed;
 		Player.ship = backupShip;
 	}
 	
 	Gene getFirstGene() {
-		return genes.getFirst();
+		return genes.get(0);
 	}
+	
+	void replaceGene(int offset) {
+		genes.set(offset, new Gene());
+	}
+	
 	void generateRandomGenes() {
 		for (int i = 0; i < Player.NB_GENES; i++) {
-			Gene gene = new Gene();
-			gene.generateRandomAttributes();
-			genes.add(gene);
+			genes.add(new Gene());
+		}
+	}
+	
+	void copyGenes(Genome genome, int from, int to) {
+		for (int i = from; i < to; i++) {
+			this.genes.add(genome.genes.get(i));
 		}
 	}
 }
@@ -282,34 +363,36 @@ class Gene {
 	int rotation;
 	int power;
 	
-	void generateRandomAttributes() {
-		Random rand = new Random();
-		int randomRotationId = rand.nextInt(Player.rotations.length);
-		int randomPowerId = rand.nextInt(Player.powers.length);
+	Gene() {
+		int randomRotationId = Player.rand.nextInt(Player.rotations.length);
+		int randomPowerId = Player.rand.nextInt(Player.powers.length);
 		this.rotation = Player.rotations[randomRotationId];
 		this.power = Player.powers[randomPowerId];
 	}
 }
 
-class Position {
+class Ship implements Cloneable {
 	double x;
 	double y;
-	Position(){};
-	Position(double x, double y) { this.x = x; this.y = y;}
-}
-
-class Ship implements Cloneable {
-	Position position;
 	double hSpeed;
 	double vSpeed;
 	int fuel;
 	int rotate;
 	int power;
-	boolean isCrashed;
-	boolean isLanded;
+	boolean isCrashed = false;
+	boolean isLanded = false;
 	
-	Ship() {
-		position = new Position();
+	public Ship(int x, int y, int hSpeed, int vSpeed, int fuel, int rotate, int power) {
+		this.x = x;
+		this.y = y;
+		this.hSpeed = hSpeed;
+		this.vSpeed = vSpeed;
+		this.fuel = fuel;
+		this.rotate = rotate;
+		this.power = power;
+	}
+
+	public Ship() {	
 	}
 	
 	void land() {
@@ -333,8 +416,8 @@ class Ship implements Cloneable {
 
 class World {
 	int[] platform;
+	Segment landSegment;
 	LinkedList<Segment> crashSegments = new LinkedList<Segment>();
-	LinkedList<Segment> landSegments = new LinkedList<Segment>();
 	int x;
 	int y;
 	
@@ -344,12 +427,13 @@ class World {
 		this.y = y;
 	}
 	
-	void addCrashSegment(int startX, int startY, int endX, int endY) {
-		this.crashSegments.add(new Segment(startX, startY, endX, endY));
-	}
-	
-	void addLandSegment(int startX, int startY, int endX, int endY) {
-		this.landSegments.add(new Segment(startX, startY, endX, endY));
+	void addSegment(int startX, int startY, int endX, int endY) {
+		if (startY == endY && (endX - startX >= 1000)) {
+			this.landSegment = new Segment(startX, startY, endX, endY);
+		}
+		else {
+			this.crashSegments.add(new Segment(startX, startY, endX, endY));
+		}
 	}
 }
 
@@ -390,21 +474,38 @@ class Segment {
 		if (segment1.a == segment2.a) { return false; }
 		if (Double.isInfinite(segment1.a)) {
 			yCollision = segment2.a * segment1.startX + segment2.b;
-			if (yCollision >= segment1.startY && yCollision <= segment1.endY) {
+			if ((
+					(yCollision >= segment1.startY && yCollision <= segment1.endY) ||
+					(yCollision <= segment1.startY && yCollision >= segment1.endY)
+				)
+					&& 
+				(
+					(yCollision >= segment2.startY && yCollision <= segment2.endY) ||
+					(yCollision <= segment2.startY && yCollision >= segment2.endY)
+				)) {
 				return true;
 			}
 		}
-		if (Double.isInfinite(segment2.a)) {
+		else if (Double.isInfinite(segment2.a)) {
 			yCollision = segment1.a * segment2.startX + segment1.b;
-			if (yCollision >= segment2.startY && yCollision <= segment2.endY) {
+			if ((
+					(yCollision >= segment1.startY && yCollision <= segment1.endY) ||
+					(yCollision <= segment1.startY && yCollision >= segment1.endY)
+				)
+					&& 
+				(
+					(yCollision >= segment2.startY && yCollision <= segment2.endY) ||
+					(yCollision <= segment2.startY && yCollision >= segment2.endY)
+				)) {
 				return true;
 			}
 		}
-		
-		xCollision = (segment1.b - segment2.b) / (segment2.a - segment1.a);
-		if (xCollision >= segment1.startX && xCollision >= segment2.startX &&
-				xCollision <= segment1.endX && xCollision <= segment2.endX) {
-			return true;
+		else {
+			xCollision = (segment1.b - segment2.b) / (segment2.a - segment1.a);
+			if (xCollision >= segment1.startX && xCollision >= segment2.startX &&
+					xCollision <= segment1.endX && xCollision <= segment2.endX) {
+				return true;
+			}
 		}
 		return false;
 	}
