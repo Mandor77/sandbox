@@ -20,6 +20,9 @@ class Player {
 	static Robot opponent = new Robot(Carrier.OPPONENT);
 	
 	static String NO_DIAGNOSED_EXPERTISE_VALUE = "0";
+	static int NB_OPPONENT_SAMPLE_OF_LOWER_RANK = 0;
+	static int NB_PLAYER_SAMPLE_OF_LOWER_RANK = 0;
+	static int MAX_DIFFERENCE_OF_LOWER_RANK = 2;
 	
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
@@ -71,6 +74,7 @@ class Player {
             
             int sampleCount = in.nextInt();
             System.err.println("Sample count " + " = " + sampleCount);
+            
             for (int i = 0; i < sampleCount; i++) {
                 int sampleId = in.nextInt();
                 int carriedBy = in.nextInt();
@@ -93,6 +97,12 @@ class Player {
                     sample.setCarriedBy(Carrier.fromInteger(carriedBy));
                 	if (Carrier.PLAYER.equals(sample.carriedBy)) {
                 		player.addSample(sample);
+                		if (Rank.R0.equals(sample.rank)) {
+                			NB_PLAYER_SAMPLE_OF_LOWER_RANK++;
+                		}
+                	}
+                	else if (Rank.R0.equals(sample.rank) && Carrier.OPPONENT.equals(sample.carriedBy)) {
+                		NB_OPPONENT_SAMPLE_OF_LOWER_RANK++;
                 	}
                 }
                 else {
@@ -103,7 +113,8 @@ class Player {
                 // Check if sample was diagnosed
                 if (!sample.diagnosed && !NO_DIAGNOSED_EXPERTISE_VALUE.equals(expertiseGain)) {
                 	sample.setDiagnosed(health, Molecule.fromString(expertiseGain));
-                	sample.setCost(costA, costB, costC, costD, costE, player.expertise);
+                	sample.setCost(costA, costB, costC, costD, costE);
+                	sample.createDue(player.expertise);
                 }
             }
 
@@ -139,7 +150,7 @@ class Player {
     
     static boolean playFromSamplesR1() {
     	if(player.getFreeSample() != 0) {
-    		if (player.getExpertiseLevel() < 4) {
+    		if (player.getExpertiseLevel() < 4  && (NB_PLAYER_SAMPLE_OF_LOWER_RANK - NB_OPPONENT_SAMPLE_OF_LOWER_RANK) < MAX_DIFFERENCE_OF_LOWER_RANK) {
     			connectTo(Rank.R0.rank + 1);
     		}
     		else if (player.getExpertiseLevel() < 9) {
@@ -196,7 +207,7 @@ class Player {
     
     static boolean playFromDiagnosisR4() {
     	for (Sample sample:player.samples) {
-    		if(sample.getRemainingDue() > Robot.MAX_MOLECULES) {
+    		if(sample.due.getTotalRemaining() > Robot.MAX_MOLECULES) {
     			connectTo(sample.id);
     			return true;
     		}
@@ -437,15 +448,16 @@ class Robot {
 	public void reassignMolecule() {
 		// Reinitialize cost
 		for (Sample sample:samples) {
-			sample.due = new Due(sample, expertise);
+			sample.createDue(expertise);
 		}
+		
 		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++) {
 			int nbMolecule = storage[numMolecule];
 			for (int j = 0; j < nbMolecule; j++) {
 				// On cherche un sample candidat
 				for (Sample sample:samples) {
 					Molecule molecule = Molecule.fromInteger(numMolecule);
-					if (sample.getRemainingDue(molecule) > 0) {
+					if (sample.due.getRemaining(molecule) > 0) {
 						sample.due.pay(molecule);
 						break;
 					}
@@ -541,7 +553,7 @@ class Robot {
 	}
 	
 	LinkedList<Molecule> getMoleculeToPay(Sample sample) {
-		return sample.due.getNextDue();
+		return sample.due.getRemainingAsList();
 	}
 }
 
@@ -550,71 +562,53 @@ class Due {
 	int[] due = new int[Player.NB_MOLECULES];
 	boolean isPaid = false;
 	
-	Due(Sample sample, int[] expertise) {
-		this.due[Molecule.A.id] = Math.max(0, sample.cost[Molecule.A.id] - expertise[Molecule.A.id]);
-		this.due[Molecule.B.id] = Math.max(0, sample.cost[Molecule.B.id] - expertise[Molecule.B.id]);
-		this.due[Molecule.C.id] = Math.max(0, sample.cost[Molecule.C.id] - expertise[Molecule.C.id]);
-		this.due[Molecule.D.id] = Math.max(0, sample.cost[Molecule.D.id] - expertise[Molecule.D.id]);
-		this.due[Molecule.E.id] = Math.max(0, sample.cost[Molecule.E.id] - expertise[Molecule.E.id]);
+	Due(int[] cost, int[] expertise) {
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++){
+			this.due[numMolecule] = Math.max(0, cost[numMolecule] - expertise[numMolecule]);
+		}
 		this.checkIfPaid();
 	}
 	
-	public LinkedList<Molecule> getNextDue() {
+	public LinkedList<Molecule> getRemainingAsList() {
 		LinkedList<Molecule> molecules = new LinkedList<Molecule>();
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++){
+			if (due[numMolecule] > 0) { molecules.add(Molecule.fromInteger(numMolecule)); }
+		}
 		
-		if (due[Molecule.A.id] > 0) { molecules.add(Molecule.A); }
-		if (due[Molecule.B.id] > 0) { molecules.add(Molecule.B); }
-		if (due[Molecule.C.id] > 0) { molecules.add(Molecule.C); }
-		if (due[Molecule.D.id] > 0) { molecules.add(Molecule.D); }
-		if (due[Molecule.E.id] > 0) { molecules.add(Molecule.E); }
 		return molecules;
 	}
 	
 	public void pay(Molecule molecule) {
-		switch(molecule) {
-			case A: due[Molecule.A.id] = Math.max(0, due[Molecule.A.id]-1);
-			break;
-			case B: due[Molecule.B.id] = Math.max(0, due[Molecule.B.id]-1);
-			break;
-			case C: due[Molecule.C.id] = Math.max(0, due[Molecule.C.id]-1);
-			break;
-			case D: due[Molecule.D.id] = Math.max(0, due[Molecule.D.id]-1);
-			break;
-			case E: due[Molecule.E.id] = Math.max(0, due[Molecule.E.id]-1);
-			break;
-		}
+		due[molecule.id] = Math.max(0, due[molecule.id]-1);
 		this.checkIfPaid();
 	}
 	
 	public void checkIfPaid() {
-		if (due[Molecule.A.id] == 0 &&
-				due[Molecule.B.id] == 0 &&
-				due[Molecule.C.id] == 0 &&
-				due[Molecule.D.id] == 0 &&
-				due[Molecule.E.id] == 0) {
-			isPaid = true;
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++){
+			if (due[numMolecule] != 0) {
+				return;
+			}
 		}
+		isPaid = true;
 	}
 	
-	public int getMaxDue() {
+	public int getMaxRemaining() {
 		int maxDue = -1;
-		maxDue = Math.max(maxDue, due[Molecule.A.id]);
-		maxDue = Math.max(maxDue, due[Molecule.B.id]);
-		maxDue = Math.max(maxDue, due[Molecule.C.id]);
-		maxDue = Math.max(maxDue, due[Molecule.D.id]);
-		maxDue = Math.max(maxDue, due[Molecule.E.id]);
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++){
+			maxDue = Math.max(maxDue, due[numMolecule]);
+		}
 		return maxDue;
 	}
 	
-	public int getNbRemainingDue() {
-		return due[Molecule.A.id] + 
-				due[Molecule.B.id] +
-				due[Molecule.C.id] +
-				due[Molecule.D.id] +
-				due[Molecule.E.id];
+	public int getTotalRemaining() {
+		int totalDue = 0;
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++){
+			totalDue += due[numMolecule];
+		}
+		return totalDue;
 	}
-	
-	public int getNbRemainingDue(Molecule molecule) {
+
+	public int getRemaining (Molecule molecule) {
 		return due[molecule.id];
 	}
 	
@@ -637,30 +631,17 @@ class Sample implements Comparable<Sample> {
 		this.rank = rank;
 	}
 	
-	public int getNbMolecules() {
-		return cost[Molecule.A.id] +
-				cost[Molecule.B.id] +
-				cost[Molecule.C.id] +
-				cost[Molecule.D.id] +
-				cost[Molecule.E.id];
-	}
-	
-	public double getRemainingDue() {
-		return this.due.getNbRemainingDue();
-	}
-	
-	public double getRemainingDue(Molecule molecule) {
-		return this.due.getNbRemainingDue(molecule);
-	}
-	
-	public void setCost(Integer costA, int costB, int costC, int costD, int costE, int[] expertise) {
+	public void setCost(Integer costA, int costB, int costC, int costD, int costE) {
 		this.cost[Molecule.A.id] = costA;
 		this.cost[Molecule.B.id] = costB;
 		this.cost[Molecule.C.id] = costC;
 		this.cost[Molecule.D.id] = costD;
 		this.cost[Molecule.E.id] = costE;
 		this.totalCost = costA + costB + costC + costD + costE;
-		this.due = new Due(this, expertise);
+	}
+	
+	public void createDue(int[] expertise) {
+		this.due = new Due(this.cost, expertise);
 	}
 	
 	public void setCarriedBy(Carrier carriedBy) {
@@ -676,7 +657,7 @@ class Sample implements Comparable<Sample> {
 	public int getMaxDue() {
 		int maxDue = -1;
 		if (this.due != null) {
-			maxDue = this.due.getMaxDue();
+			maxDue = this.due.getMaxRemaining();
 		}
 		return maxDue;
 	}
