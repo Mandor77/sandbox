@@ -175,9 +175,10 @@ class Player {
      */
     static void playFromDiagnosis() {
     	if (playFromDiagnosisR1()) { return; }	// Diagnosed undiagnosed samples
-    	if (playFromDiagnosisR3()) { return; }	// Waste the worst
-    	if (playFromDiagnosisR4()) { return; }
-    	if (playFromDiagnosisR2()) { return; }	// Go to molecules
+    	if (playFromDiagnosisR3()) { return; }	// Remove big unaffordable
+    	if (playFromDiagnosisR5()) { return; }  // Remove if not enough money
+    	if (playFromDiagnosisR4()) { return; }	// Remove the too big one
+    	if (playFromDiagnosisR2()) { return; }	// Go to samples or to molecules
     }
     
     static boolean playFromDiagnosisR1() {
@@ -191,14 +192,10 @@ class Player {
     }
     
     static boolean playFromDiagnosisR3() {
-    	if(player.getFreeSample() == 0) {
-    		if(player.getFreeMolecule() < 3) {
-    			ArrayList<Sample> backups = new ArrayList<Sample>();
-    			backups.add(player.samples.remove());
-    			backups.add(player.samples.remove());
-    			Sample sample = player.samples.remove();
+    	for (Sample sample:player.samples) {
+    		if(!sample.due.checkIfCanBePaid(Player.availables) && sample.due.getTotalRemaining() > 2) {
     			connectTo(sample.id);
-    			player.samples.addAll(backups);
+    			player.remove(sample);
     			return true;
     		}
     	}
@@ -215,7 +212,22 @@ class Player {
     	return false;
     }
     
+    static boolean playFromDiagnosisR5() {
+    	for (Sample sample:player.samples) {
+    		if(sample.due.getTotalRemaining() > player.getFreeMolecule()) {
+    			connectTo(sample.id);
+    			player.remove(sample);
+    			return true;
+    		}
+    	}
+    	return false;
+    }
+    
     static boolean playFromDiagnosisR2() {
+    	if (player.getFreeSample() > 1) {
+    		goTo(Module.SAMPLES);
+    		return true;
+    	}
     	goTo(Module.MOLECULES);
     	return true;
     }
@@ -259,10 +271,10 @@ class Player {
 				Sample sample = player.samples.remove();
 				backups.add(sample);
 				if (!sample.due.isPaid) {
-					molecules = player.getMoleculeToPay(sample);
+					molecules = sample.due.getRemainingAsList();
 					for (Molecule molecule:molecules) {
 						if (availables[molecule.id] > 0) {
-							player.payMolecule(sample, molecule, false);
+							sample.due.pay(molecule);
 							connectTo(molecule);
 							player.samples.addAll(backups);
 							return true;
@@ -286,7 +298,7 @@ class Player {
 				return false;
 			}
     	}
-    	if (player.getFreeMolecule() == 0 || player.getFreeSample() == 0) {
+    	if (player.getFreeSample() == 0) {
     		goTo(Module.DIAGNOSIS);
     	}
     	else {
@@ -307,9 +319,9 @@ class Player {
     }
     
     static boolean playFromLaboratoryR1() {
-    	Sample sample = player.getNextPaidSample();
+    	Sample sample = player.getPaidSample();
 		if (sample != null) {
-			player.paySample(sample);
+			player.remove(sample);
 			connectTo(sample.id);
 			return true;
 		}
@@ -331,15 +343,18 @@ class Player {
     
     static boolean playFromLaboratoryR4() {
     	if (player.samples.size() > 1) {
-    		goTo(Module.MOLECULES);
-    		return true;
+    		for (Sample sample:player.samples) {
+    			if (sample.due.checkIfCanBePaid(player.available));
+        		goTo(Module.MOLECULES);
+        		return true;
+    		}
     	}
     	return false;
     }
 
     static void playClassic() {
     
-    	if (player.getModule() == null) {
+    	if (player.module == null) {
     		playFromNoWhere();
     	}
     	else if (player.isAtModule(Module.SAMPLES)) {
@@ -398,10 +413,12 @@ class Robot {
 	Carrier carrier;
 	int distanceToModule = 0;
 	int score = 0;
-	int nbMolecule = 0;
+	int totalStorage = 0;
 
 	int[] expertise = new int[Player.NB_MOLECULES];
 	int[] storage = new int[Player.NB_MOLECULES];
+	int[] available = new int[Player.NB_MOLECULES];
+	
 	PriorityQueue<Sample> samples = new PriorityQueue<Sample>();
 	
 	Robot(Carrier carrier) {
@@ -411,10 +428,6 @@ class Robot {
 	void setModule(Module module, int distanceToModule) {
 		this.module = module;
 		this.distanceToModule = distanceToModule;
-	}
-	
-	Module getModule() {
-		return this.module;
 	}
 	
 	boolean isAtModule(Module module) {
@@ -433,39 +446,19 @@ class Robot {
 		}
 		return false;
 	}
+	
 	public int getExpertiseLevel() {
-		return this.expertise[Molecule.A.id] +
-				expertise[Molecule.B.id] +
-				expertise[Molecule.C.id] +
-				expertise[Molecule.D.id] +
-				expertise[Molecule.E.id];
+		int expertiseLevel = 0;
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++) {
+			expertiseLevel += this.expertise[numMolecule];
+		}
+		return expertiseLevel;
 	}
 	
 	public void setScore(int score) {
 		this.score = score;
 	}
-	
-	public void reassignMolecule() {
-		// Reinitialize cost
-		for (Sample sample:samples) {
-			sample.createDue(expertise);
-		}
 		
-		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++) {
-			int nbMolecule = storage[numMolecule];
-			for (int j = 0; j < nbMolecule; j++) {
-				// On cherche un sample candidat
-				for (Sample sample:samples) {
-					Molecule molecule = Molecule.fromInteger(numMolecule);
-					if (sample.due.getRemaining(molecule) > 0) {
-						sample.due.pay(molecule);
-						break;
-					}
-				}
-			}
-		}
-	}
-	
 	public void setExpertise(Integer expertiseA, int expertiseB, int expertiseC, int expertiseD, int expertiseE) {
 		this.expertise[Molecule.A.id] = expertiseA;
 		this.expertise[Molecule.B.id] = expertiseB;
@@ -480,14 +473,20 @@ class Robot {
 		this.storage[Molecule.C.id] = storageC;
 		this.storage[Molecule.D.id] = storageD;
 		this.storage[Molecule.E.id] = storageE;
-		this.nbMolecule = storageA + storageB + storageC + storageD + storageE;
+		this.totalStorage = storageA + storageB + storageC + storageD + storageE;
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++) {
+			this.available[numMolecule] = this.storage[numMolecule];
+		}
 	}
 	
-	/**
-	 * Start of intelligence
-	 */
+	int getFreeSample() {
+		return MAX_SAMPLES - this.samples.size();
+	}
 	
-	// Return false if max samples is reached
+	int getFreeMolecule() {
+		return MAX_MOLECULES - this.totalStorage;
+	}
+	
 	boolean addSample(Sample sample) {
 		boolean status = false;
 		if (!(samples.size() > MAX_SAMPLES)) {
@@ -496,64 +495,50 @@ class Robot {
 		return status;
 	}
 	
-	// Valid a sample
-	void paySample(Sample sample) {
-		Molecule molecule = sample.expertiseGain;
-		this.expertise[molecule.id]++;
-		this.remove(sample);
-		for (Sample gameSample:Player.samples.values()) {
-			this.payMolecule(gameSample, molecule, true);
-		}
-	}
-	
 	void remove(Sample sample) {
-		samples.remove(sample);
+		if (samples.contains(sample)) {
+			samples.remove(sample);
+		}
 	}
 	
-	int getFreeSample() {
-		return MAX_SAMPLES - this.samples.size();
-	}
-	
-	Sample getWorstSample() {
-		Sample worstSample = null;
-		int worstFitness = 999;
+	/**
+	 * Start of intelligence
+	 */
+	public void reassignMolecule() {
+		// Reinitialize cost
 		for (Sample sample:samples) {
-			if (worstSample == null) { worstSample = sample; break;}
-			if (sample.compareTo(worstSample) < 0) { worstSample = sample;}
+			sample.createDue(expertise);
+			if(sample.due.checkIfCanBePaid(available)) {
+				System.err.println("Can be paid " + sample.id);
+				for(Molecule molecule:sample.due.getRemainingAsList()) {
+					sample.due.pay(molecule);
+					this.available[molecule.id]--;
+				}
+			}
 		}
-		return worstSample;
-	}
-	
-	int getFreeMolecule() {
-		return MAX_MOLECULES - this.nbMolecule;
-	}
-	
-	void payMolecule(Sample sample, Molecule molecule, boolean free) {
-		if (sample.due != null) {
-			sample.due.pay(molecule);
+		
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++) {
+			int nbMolecule = available[numMolecule];
+			for (int j = 0; j < nbMolecule; j++) {
+				for (Sample sample:samples) {
+					Molecule molecule = Molecule.fromInteger(numMolecule);
+					if (sample.due.getRemaining(molecule) > 0) {
+						sample.due.pay(molecule);
+						this.available[molecule.id]--;
+						break;
+					}
+				}
+			}
 		}
 	}
-	
-	Sample getNextPaidSample() {
+		
+	Sample getPaidSample() {
 		for (Sample sample:samples) {
 			if (sample.due.isPaid) {
 				return sample;
 			}
 		}
 		return null;
-	}
-	
-	Sample getSampleToPay() {
-		for (Sample sample:samples) {
-			if (!sample.due.isPaid) {
-				return sample;
-			}
-		}
-		return null;
-	}
-	
-	LinkedList<Molecule> getMoleculeToPay(Sample sample) {
-		return sample.due.getRemainingAsList();
 	}
 }
 
@@ -572,7 +557,9 @@ class Due {
 	public LinkedList<Molecule> getRemainingAsList() {
 		LinkedList<Molecule> molecules = new LinkedList<Molecule>();
 		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++){
-			if (due[numMolecule] > 0) { molecules.add(Molecule.fromInteger(numMolecule)); }
+			for (int nbMolecule = 0; nbMolecule < due[numMolecule]; nbMolecule++) { 
+				molecules.add(Molecule.fromInteger(numMolecule)); 
+			}
 		}
 		
 		return molecules;
@@ -590,6 +577,15 @@ class Due {
 			}
 		}
 		isPaid = true;
+	}
+	
+	public boolean checkIfCanBePaid(int[] available) {
+		for (int numMolecule = 0; numMolecule < Player.NB_MOLECULES; numMolecule++){
+			if(available[numMolecule] < due[numMolecule]) {
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	public int getMaxRemaining() {
@@ -654,14 +650,6 @@ class Sample implements Comparable<Sample> {
 		this.diagnosed = true;
 	}
 	
-	public int getMaxDue() {
-		int maxDue = -1;
-		if (this.due != null) {
-			maxDue = this.due.getMaxRemaining();
-		}
-		return maxDue;
-	}
-	
 	@Override
 	public int compareTo(Sample o) {
 		
@@ -682,8 +670,8 @@ class Sample implements Comparable<Sample> {
 				return Integer.signum(this.rank.rank - o.rank.rank);
 			}
 			// If both are same rank, priority to max due
-			if (Math.max(this.getMaxDue(), 4) != Math.max(o.getMaxDue(), 4)) {
-				return Integer.signum(Math.max(this.getMaxDue(), 4) - Math.max(o.getMaxDue(), 4));
+			if (this.due != null && o.due != null && Math.max(this.due.getMaxRemaining(), 4) != Math.max(o.due.getMaxRemaining(), 4)) {
+				return Integer.signum(Math.max(this.due.getMaxRemaining(), 4) - Math.max(o.due.getMaxRemaining(), 4));
 			}
 			else {
 				return Integer.signum(o.health - this.health);
