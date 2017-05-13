@@ -139,7 +139,16 @@ class Player {
     
     static boolean playFromSamplesR1() {
     	if(player.getFreeSample() != 0) {
-			connectTo(Rank.R0.rank + 1);
+    		if (player.getExpertiseLevel() < 9) {
+    			connectTo(Rank.R0.rank + 1);
+    		}
+    		else if (player.getExpertiseLevel() < 18) {
+    			connectTo(Rank.R1.rank + 1);
+    		}
+    		else {
+    			connectTo(Rank.R2.rank + 1);
+    		}
+			
 			return true;
 		}
     	return false;
@@ -156,6 +165,7 @@ class Player {
     static void playFromDiagnosis() {
     	if (playFromDiagnosisR1()) { return; }	// Diagnosed undiagnosed samples
     	//if (playFromDiagnosisR3()) { return; }	// Waste the worst
+    	if (playFromDiagnosisR4()) { return; }
     	if (playFromDiagnosisR2()) { return; }	// Go to molecules
     }
     
@@ -175,6 +185,16 @@ class Player {
     		player.remove(sample);
     		connectTo(sample.id);
     		return true;
+    	}
+    	return false;
+    }
+    
+    static boolean playFromDiagnosisR4() {
+    	for (Sample sample:player.samples) {
+    		if(sample.getRemainingDue() > Robot.MAX_MOLECULES) {
+    			connectTo(sample.id);
+    			return true;
+    		}
     	}
     	return false;
     }
@@ -366,6 +386,14 @@ class Robot {
 		return value;
 	}
 	
+	public int getExpertiseLevel() {
+		return this.expertise[Molecule.A.id] +
+				expertise[Molecule.B.id] +
+				expertise[Molecule.C.id] +
+				expertise[Molecule.D.id] +
+				expertise[Molecule.E.id];
+	}
+	
 	public void setScore(int score) {
 		this.score = score;
 	}
@@ -545,8 +573,8 @@ class Sample implements Comparable<Sample> {
 				cost[Molecule.E.id];
 	}
 	
-	public double getDueRatio() {
-		return this.due.getNbRemainingDue() / this.getNbMolecules();
+	public double getRemainingDue() {
+		return this.due.getNbRemainingDue();
 	}
 	
 	public void setCost(Integer costA, int costB, int costC, int costD, int costE, int[] expertise) {
@@ -580,7 +608,7 @@ class Sample implements Comparable<Sample> {
 			}
 		}
 		
-		if (this.getDueRatio() <= o.getDueRatio()) {
+		if (this.getRemainingDue() <= o.getRemainingDue()) {
 			return 1;
 		}
 		else {
