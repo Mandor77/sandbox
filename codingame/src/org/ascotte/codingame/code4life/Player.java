@@ -25,7 +25,7 @@ class Player {
 	static int NB_PLAYER_SAMPLE_OF_LOWER_RANK = 0;
 	static int MAX_DIFFERENCE_OF_LOWER_RANK = 1;
 	
-	static int NB_TURN = 0;
+	static int NB_TURN = 10;
 	
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
@@ -246,7 +246,7 @@ class Player {
     }
     
     static boolean playFromDiagnosisR2() {
-    	if (player.getFreeSample() > 1) {
+    	if (player.getFreeSample() > 2) {
     		goTo(Module.SAMPLES);
     		return true;
     	}
@@ -379,9 +379,10 @@ class Player {
     static boolean playFromLaboratoryR4() {
     	if (player.samples.size() > 1) {
     		for (Sample sample:player.samples) {
-    			if (sample.due.checkIfCanBePaid(player.available));
-        		goTo(Module.MOLECULES);
-        		return true;
+    			if (sample.due.checkIfCanBePaid(Player.availables)) {
+    				goTo(Module.MOLECULES);
+    				return true;
+    			}
     		}
     	}
     	return false;
