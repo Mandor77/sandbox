@@ -3,12 +3,16 @@ package org.ascotte.codingame.code4life.simulation;
 import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.toMap;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
 public class Player {
 
-    public static void mainmain(String args[]) {
+	static Engine engine = new Engine();
+	
+    public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         int projectCount = in.nextInt();
         for (int i = 0; i < projectCount; i++) {
@@ -60,27 +64,24 @@ public class Player {
             }
         }
     }
-    
-    public static void main(String args[]) {
-    	
-    }
 }
 
 class Robot {
 	final Carrier id;
 	
-	Module fromModule;
-	Module toModule;
+	ModuleName fromModule;
+	ModuleName toModule;
 	int distanceToModule;
 	int score;
 	int[] expertise = new int[Constants.NB_MOLECULES];
 	int[] storage = new int[Constants.NB_MOLECULES];
+	List<Sample> samples = new ArrayList<Sample>();
 
 	Robot(Carrier id) {
 		this.id = id;
 	}
 	
-	public void moveToModule(Module toModule) throws InvalidMoveException {
+	public void moveToModule(ModuleName toModule) throws InvalidMoveException {
 		if (this.distanceToModule != 0) { throw new InvalidMoveException(Messages.exception_invalid_move_not_arrived); }
 		if (this.toModule == null) { throw new InvalidMoveException(Messages.exception_invalid_target_module); }
 		if (this.toModule.equals(toModule)) { throw new InvalidMoveException(Messages.exception_invalid_move_same_target); }
@@ -118,8 +119,50 @@ class Robot {
 		if (freeCapacity < 0) { throw new InvalidStorageOrderException(Messages.exception_invalid_free_capacity); }
 		return freeCapacity;
 	}
+	
+	public void addSample(Sample sample) throws InvalidSampleOrderException {
+		if (this.samples.size() == Constants.MAX_SAMPLES_BY_ROBOT) {
+			throw new InvalidSampleOrderException(Messages.exception_max_samples_by_robot_reached);
+		}
+		this.samples.add(sample);
+	}
+	
+	public void removeSample(Sample sample) throws InvalidSampleOrderException {
+		if (!this.samples.contains(sample)) {
+			throw new InvalidSampleOrderException(Messages.exception_sample_is_not_found);
+		}
+		this.samples.remove(sample);
+	}
+	
+	public int getSampleFreeCapacity() throws InvalidSampleOrderException {
+		int freeCapacity = Constants.MAX_SAMPLES_BY_ROBOT - this.samples.size();
+		if (freeCapacity < 0) { throw new InvalidSampleOrderException(Messages.exception_invalid_free_capacity); }
+		return freeCapacity;
+	}
 }
 
+class Project {
+	private final int id;
+	private final int[] cost;
+	private boolean isActive;
+	
+	Project(int id, int[] cost) {
+		this.id = id;
+		this.cost = cost;
+		this.isActive = true;
+	}
+	
+	public boolean checkCompletion(int [] expertise) {
+		if (!this.isActive) { return false; }
+		for (int i = 0; i < Constants.NB_MOLECULES; i++) {
+			if (this.cost[i] > expertise[i]) {
+				return false;
+			}
+		}
+		this.isActive = false;
+		return true;
+	}
+}
 
 class Sample {
 	private final int id;
@@ -152,15 +195,87 @@ class Sample {
 	}
 }
 
+class Engine {
+
+	private final Robot player = new Robot(Carrier.PLAYER);
+	private final Robot opponent = new Robot(Carrier.OPPONENT);
+	private final Module samplesModule = new SamplesModule();
+	private final Module diagnosisModule = new DiagnosisModule();
+	private final Module moleculesModule = new MoleculesModule();
+	private final Module laboratoryModule = new LaboratoryModule();
+	
+	Engine() {
+		
+	}
+	
+	public void run() {
+		
+	}
+	
+	public Robot getRobot(Carrier carrier) {
+		Robot robot = null;
+		if (Carrier.PLAYER.equals(carrier)) { robot = this.player; }
+		else if(Carrier.OPPONENT.equals(carrier)) { robot = this.opponent; }
+		return robot;
+	}
+	
+	private boolean goToModule(Robot robot, ModuleName toModule) {
+		try {
+			robot.moveToModule(toModule);
+			return true;
+		} catch (InvalidMoveException e) {
+			System.err.println(e.getMessage());
+			return false;
+		}
+	}
+}
+
+class Module {
+	ModuleName name;
+	
+	Module(ModuleName name) {
+		this.name = name;
+	}
+}
+
+class SamplesModule extends Module {
+	
+	SamplesModule() {
+		super(ModuleName.SAMPLES);
+	}
+}
+
+class DiagnosisModule extends Module {
+	
+	DiagnosisModule() {
+		super(ModuleName.DIAGNOSIS);
+	}
+}
+
+class MoleculesModule extends Module {
+	
+	MoleculesModule() {
+		super(ModuleName.MOLECULES);
+	}
+}
+
+class LaboratoryModule extends Module {
+	
+	LaboratoryModule() {
+		super(ModuleName.LABORATORY);
+	}
+}
+
 class Constants {
 	final static int NB_MOLECULES = 5;
 	final static int NB_MODULES = 5;
-	final static int[][] distancesBetweenModules = {{0, 0, 0, 0, 0},
-													{0, 0, 0, 0, 0},
-													{0, 0, 0, 0, 0},
-													{0, 0, 0, 0, 0},
-													{0, 0, 0, 0, 0}};
+	final static int[][] distancesBetweenModules = {{0, 3, 3, 3, 2},
+													{3, 0, 3, 4, 2},
+													{3, 3, 0, 3, 2},
+													{3, 4, 3, 0, 2},
+													{2, 2, 2, 2, 0}};
 	final static int MAX_STORAGE = 10;
+	final static int MAX_SAMPLES_BY_ROBOT = 3;
 }
 
 class Messages {
@@ -171,16 +286,18 @@ class Messages {
 	final static String exception_not_found_molecule = "Requested molecule was not found inside storage";
 	final static String exception_invalid_free_capacity = "Current storage is over maximal capacity";
 	final static String exception_storage_is_full = "Storage is full, not possible to add a new molecule";
+	final static String exception_max_samples_by_robot_reached = "The number max of samples by robot is reached";
+	final static String exception_sample_is_not_found = "Sample is not found in the sample list";
 }
 
-enum Module {
+enum ModuleName {
 	SAMPLES(0), DIAGNOSIS(1), MOLECULES(2), LABORATORY(4), CENTER(5); 
 	private final int id;
-	private final static Map<Integer, Module> map =
-		stream(Module.values()).collect(toMap(module -> module.toInteger(), module -> module));
+	private final static Map<Integer, ModuleName> map =
+		stream(ModuleName.values()).collect(toMap(module -> module.toInteger(), module -> module));
 
-	Module(int id) { this.id = id; }
-	Module get(int id) { return map.get(id); }
+	ModuleName(int id) { this.id = id; }
+	ModuleName get(int id) { return map.get(id); }
 	public int toInteger() { return this.id; }
 }
 
@@ -220,6 +337,13 @@ class InvalidMoveException extends Exception {
 class InvalidStorageOrderException extends Exception {
 	private static final long serialVersionUID = 1L;
 	InvalidStorageOrderException(String message) {
+		super(message);
+	}
+}
+
+class InvalidSampleOrderException extends Exception {
+	private static final long serialVersionUID = 1L;
+	InvalidSampleOrderException(String message) {
 		super(message);
 	}
 }
