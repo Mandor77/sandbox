@@ -327,6 +327,10 @@ enum Carrier {
 	PLAYER, OPPONENT, CLOUD;
 }
 
+enum Order {
+	GOTO_DIAGNOSIS, GOTO_MOLECULES, GOTO_LABORATORY, GOTO_SAMPLES;
+}
+
 class InvalidMoveException extends Exception {
 	private static final long serialVersionUID = 1L;
 	InvalidMoveException(String message) {
