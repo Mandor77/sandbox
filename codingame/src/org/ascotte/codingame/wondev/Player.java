@@ -2,8 +2,10 @@ package org.ascotte.codingame.wondev;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.Stack;
 
 class Utils {
 	final static StringBuilder buffer = new StringBuilder();
@@ -36,6 +38,7 @@ class Player {
 	final static int PLAYER = 0;
 	final static int OPPONENT = 1;
 	final static int MAX_SIMULATIONS = 1000;
+	final static int SIMULATION_LENGTH = 3;
 	
 	public static void main(String args[]) {
 		Scanner in = new Scanner(System.in);
@@ -71,12 +74,12 @@ class Player {
 			for (int i = 0; i < nbPawnsByHuman; i++) {
 				int unitX = in.nextInt();
 				int unitY = in.nextInt();
-				game.setPawnLocation(PLAYER, i, unitX, unitY);
+				game.setPawnLocation(PLAYER, i, unitX, unitY, false);
 			}
 			for (int i = 0; i < nbPawnsByHuman; i++) {
 				int otherX = in.nextInt();
 				int otherY = in.nextInt();
-				game.setPawnLocation(OPPONENT, i, otherX, otherY);
+				game.setPawnLocation(OPPONENT, i, otherX, otherY, false);
 			}
 			
 			int legalActions = in.nextInt();
@@ -87,39 +90,91 @@ class Player {
 				String dir2 = in.next();
 			}
 			
+			long debut = System.currentTimeMillis();
 			List<LegalAction> legalActionList= new ArrayList<>();
 			legalActionList = game.getLegalActions(PLAYER, 0);
+			legalActionList.addAll(game.getLegalActions(PLAYER, 1));
 			Utils.debug("Nombre actions " + legalActionList.size() + " / " + legalActions);
 			
-			for (int i = 0; i < MAX_SIMULATIONS; i++) {
-				LegalAction legalAction = IA.playRandomIA(legalActionList);
-				LegalAction rollbackAction = simulateLegalAction(legalAction);
-				
-				List<LegalAction> nextLegalActionList = new ArrayList<>();
-				nextLegalActionList = game.getLegalActions(PLAYER, 0);
-				LegalAction nextLegalAction = IA.playRandomIA(nextLegalActionList);
-				LegalAction nextRollbackAction = simulateLegalAction(nextLegalAction);
-				
-				legalAction.setFitness(game.fitness(PLAYER));
-				
-				simulateLegalAction(nextRollbackAction);
-				simulateLegalAction(rollbackAction);
-			}
+			LegalAction.globalAverageFitness = 0;
+			LegalAction.globalNumberFitness = 0;
 			
-			LegalAction bestLegalAction = null;
+			simulate(legalActionList);
+			chooseBest(legalActionList);
+			long end = System.currentTimeMillis();
+			Utils.debug("Duration = " + (end - debut));
+			
 			for (LegalAction legalAction:legalActionList) {
-				if (bestLegalAction == null) { bestLegalAction = legalAction; continue; }
-				if (legalAction.getFitness() > bestLegalAction.getFitness()) {
-					bestLegalAction = legalAction;
-				}
+				Utils.debug("Average " + legalAction.pawnId + " " + legalAction.moveTo + " " + 
+			      legalAction.buildTo + " = " + legalAction.numberFitness + "/" + legalAction.fitness + "/" + legalAction.averageFitness);
 			}
-			
-			publishLegalAction(bestLegalAction);
 		}
 	}
 	
+	public static void simulate(List<LegalAction> initialLegalActionList) {
+		Stack<LegalAction> rollbacks = new Stack<>();
+		LegalAction rollbackAction;
+		
+		// Choose and play a random action
+		for (int i = 0; i < MAX_SIMULATIONS; i++) {
+			LegalAction initialLegalAction;
+			if (i < 500) {
+				initialLegalAction = IA.playRandomIA(initialLegalActionList);
+			}
+			else {
+				initialLegalAction = IA.playSelectiveIA(initialLegalActionList);
+			}
+			rollbackAction = simulateLegalAction(initialLegalAction);
+			rollbacks.push(rollbackAction);
+			
+			initialLegalAction.setFitness((game.fitness(PLAYER)));
+			
+			// Then explore
+			LegalAction legalAction = initialLegalAction;
+			for (int j = SIMULATION_LENGTH; j > 0; j--) {
+				// If childs not defined
+				if (legalAction.getChilds() == null) {
+					List<LegalAction> legalActionList = game.getLegalActions(PLAYER, 0);
+					legalActionList.addAll(game.getLegalActions(PLAYER, 1));
+					legalAction.setChilds(legalActionList);
+				}
+				
+				LegalAction nextLegalAction = IA.playRandomIA(legalAction.getChilds());
+				if (nextLegalAction == null) { break; }
+				LegalAction nextRollbackAction = simulateLegalAction(nextLegalAction);
+				rollbacks.push(nextRollbackAction);
+				
+				initialLegalAction.setFitness((game.fitness(PLAYER)));
+				
+				legalAction = nextLegalAction;
+			}
+			
+			while(!rollbacks.isEmpty()) {
+				simulateLegalAction(rollbacks.pop());
+			}
+		}
+	}
+	
+	public static void chooseBest(List<LegalAction> initialLegalActionList)
+	{
+		LegalAction bestLegalAction = null;
+		for (LegalAction legalAction:initialLegalActionList) {
+			if (bestLegalAction == null) { bestLegalAction = legalAction; continue; }
+			if (legalAction.getFitness() > bestLegalAction.getFitness()) {
+				bestLegalAction = legalAction;
+			}
+			else if (legalAction.getFitness() == bestLegalAction.getFitness()) {
+				if (legalAction.getAverageFitness() > bestLegalAction.getAverageFitness()) {
+					bestLegalAction = legalAction;
+				}
+			}
+		}
+		
+		publishLegalAction(bestLegalAction);
+	}
+	
 	public static void publishLegalAction(LegalAction legalAction) {
-		Utils.publish(legalAction.getCommand(), String.valueOf(legalAction.getPlayerIndex()), legalAction.getMoveTo().name(), legalAction.getBuildTo().name());
+		Utils.publish(legalAction.getCommand(), String.valueOf(legalAction.getPawnId()), legalAction.getMoveTo().name(), legalAction.getBuildTo().name());
 	}
 	
 	public static LegalAction simulateLegalAction(LegalAction legalAction) {
@@ -145,9 +200,12 @@ class Game {
 		return this.grid;
 	}
 	
-	public void setPawnLocation(int playerId, int pawnId, int x, int y) {
+	public void setPawnLocation(int playerId, int pawnId, int x, int y, boolean rollback) {
+		// If not visible cancel
+		if (x == -1 || y == -1) { return; }
 		Cell cell = this.grid.getCell(x, y);
-		Pawn pawn = this.humans[playerId].getPawn(pawnId);
+		Human human = this.humans[playerId];
+		Pawn pawn = human.getPawn(pawnId);
 		// Remove current pawn location
 		Cell currentLocation = pawn.getLocation();
 		if (currentLocation != null) {
@@ -155,6 +213,14 @@ class Game {
 		}
 		cell.addPawn(pawn);
 		pawn.setLocation(cell);
+		
+		// Scoring
+		if (!rollback && cell.height == 3) {
+			human.addToScore(1);
+		}
+		else if (rollback && currentLocation !=null && currentLocation.height == 3) {
+			human.addToScore(-1);
+		}
 	}
 	
 	public List<LegalAction> getLegalActions(int playerId, int pawnId) {
@@ -203,7 +269,7 @@ class Game {
 		switch(legalAction.getCommand()) {
 		case MOVEBUILD:
 			targetCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, moveDirection);
-			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length);
+			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length, false);
 			buildCell = this.grid.getNeighbourgCell(targetCell.width, targetCell.length, buildDirection);
 			buildCell.upHeight();
 			break;
@@ -211,14 +277,16 @@ class Game {
 			buildCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, buildDirection);
 			buildCell.downHeight();
 			targetCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, moveDirection);
-			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length);
+			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length, true);
 			break;
 		}
 	}
 	
 	public int fitness(int playerId) {
-		Pawn pawn = this.humans[playerId].getPawn(0);
-		return pawn.getLocation().height;
+		Human human = this.humans[playerId];
+		Pawn pawn = human.getPawn(0);
+		int fitness = 5 * human.getScore() + pawn.getLocation().height;
+		return fitness;
 	}
 }
 
@@ -304,7 +372,7 @@ class Cell {
 	
 	public boolean isReachable(int fromHeight) {
 		if (pawn != null) {return false;}
-		if (height == -1) {return false;}
+		if (height == -1 || height == 4) {return false;}
 		if (height - fromHeight > 1) {return false;}
 		return true;
 	}
@@ -327,6 +395,7 @@ class Cell {
 class Human {
 	Pawn[] pawn = null;
 	int nbPawns = 0;
+	int score = 0;
 	
 	public Human(int nbPawns) {
 		this.pawn = new Pawn[nbPawns];
@@ -338,6 +407,14 @@ class Human {
 	
 	public Pawn getPawn(int pawnId) {
 		return this.pawn[pawnId];
+	}
+	
+	public void addToScore(int increment) {
+		this.score += increment;
+	}
+	
+	public int getScore() {
+		return this.score;
 	}
 }
 
@@ -358,13 +435,18 @@ class Engine {
 }
 
 
-class LegalAction {
+class LegalAction implements Comparable<LegalAction> {
+	static double globalAverageFitness = 0;
+	static double globalNumberFitness = 0;
 	Command command;
 	int playerIndex;
 	int pawnId;
 	Direction moveTo;
 	Direction buildTo;
 	int fitness = 0;
+	double averageFitness = 0;
+	int numberFitness = 0;
+	List<LegalAction> childs;
 	
 	LegalAction(Command command, int playerIndex, int pawnId, Direction moveTo, Direction buildTo) {
 		this.command = command;
@@ -398,6 +480,10 @@ class LegalAction {
 		return this.fitness;
 	}
 	
+	public double getAverageFitness() {
+		return this.averageFitness;
+	}
+	
 	public LegalAction getReverse() {
 		Command command = Command.getReverse(this.command);
 		Direction moveTo = Direction.getReverse(this.moveTo);
@@ -405,12 +491,35 @@ class LegalAction {
 		return legalAction;
 	}
 	
+	public void setChilds(List<LegalAction> legalActionList) {
+		this.childs = legalActionList;
+	}
+	
+	public List<LegalAction> getChilds() {
+		return this.childs;
+	}
+	
 	public void setFitness(int fitness) {
 		this.fitness = Math.max(this.fitness, fitness);
+		this.averageFitness = ((this.averageFitness * this.numberFitness) + fitness) / (this.numberFitness + 1);
+		this.numberFitness++;
+		globalAverageFitness = ((globalAverageFitness * globalNumberFitness) + fitness) / (globalNumberFitness + 1);
+		globalNumberFitness++;
 	}
 	
 	public String toString() {
 		return this.command.name() + " " + this.playerIndex + " " + this.pawnId + " " + this.moveTo.name() + " " + this.buildTo.name();
+	}
+	
+	public int compareTo(LegalAction legalAction) {
+		if (this.averageFitness > legalAction.averageFitness) {
+			return -1;
+		}
+		else if (this.averageFitness < legalAction.averageFitness) {
+			return 1;
+		}
+		return 0;
+		
 	}
 }
 
@@ -419,7 +528,23 @@ class IA {
 	static Random rand = new Random();
 	
 	public static LegalAction playRandomIA(List<LegalAction> legalActionList) {
-		LegalAction actionToPlay = legalActionList.get(rand.nextInt(legalActionList.size() - 1));
+		int size = legalActionList.size();
+		if (size == 0) { return null; }
+		int index = rand.nextInt(size);
+		LegalAction actionToPlay = legalActionList.get(index);
+		return actionToPlay;
+	}
+	
+	public static LegalAction playSelectiveIA(List<LegalAction> legalActionList) {
+		PriorityQueue<LegalAction> priority = new PriorityQueue<LegalAction>();
+		priority.addAll(legalActionList);
+		int index = rand.nextInt(5);
+		LegalAction actionToPlay = null;
+		
+		while(!priority.isEmpty() && index >= 0) {
+			actionToPlay = priority.remove();
+			index--;
+		}
 		return actionToPlay;
 	}
 }
