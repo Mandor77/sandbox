@@ -1,13 +1,12 @@
 package org.ascotte.codingame.wondev;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.Stack;
-
-import sun.security.util.LegacyAlgorithmConstraints;
 
 class Utils {
 	final static StringBuilder buffer = new StringBuilder();
@@ -39,11 +38,12 @@ class Player {
 	final static Game game = new Game();
 	final static int PLAYER = 0;
 	final static int OPPONENT = 1;
-	final static int MAX_SIMULATIONS = 1000;
-	final static int SIMULATION_LENGTH = 0;
+	final static int MAX_SIMULATIONS = 5000;
+	final static int SIMULATION_LENGTH = 1;
 	final static int MAX_TURN = 400;
 	static int NUM_TURN = 0;
 	static Statistics[][][] statistics = new Statistics[MAX_TURN][SIMULATION_LENGTH + 1][Game.LEGAL_ACTIONS.length];
+	static HashMap<String, List<LegalAction>> actionMap = new HashMap<String, List<LegalAction>>();
 	
 	public static void main(String args[]) {
 		Scanner in = new Scanner(System.in);
@@ -108,7 +108,8 @@ class Player {
 			
 			long debut = System.currentTimeMillis();
 			List<LegalAction> legalActionList= new ArrayList<>();
-			legalActionList = game.getLegalActions(PLAYER);
+			String key = "" + NUM_TURN + "-";
+			legalActionList = game.getLegalActions(PLAYER, key);
 			Utils.debug("Nombre actions " + legalActionList.size() + " / " + legalActions);
 	
 			simulate(legalActionList);
@@ -134,13 +135,15 @@ class Player {
 		
 		// Choose and play a random action
 		for (int i = 0; i < MAX_SIMULATIONS; i++) {
+		    String key = "" + NUM_TURN + "-";
 			LegalAction initialLegalAction;
 			initialLegalAction = IA.playRandomIA(initialLegalActionList);
+			key = key + initialLegalAction.id;
 			
 			rollbackAction = simulateLegalAction(initialLegalAction);
 			rollbacks.push(rollbackAction);
 			
-			statistics[NUM_TURN][0][initialLegalAction.getId()].setFitness(game.fitness(PLAYER));
+			//statistics[NUM_TURN][0][initialLegalAction.getId()].setFitness(game.fitness(PLAYER));
 			
 			// Play opponent
 			LegalAction legalAction;
@@ -164,15 +167,21 @@ class Player {
 			// Then explore
 			for (int j = SIMULATION_LENGTH; j > 0; j--) {
 				// If childs not defined
-				if (legalAction.getChilds() == null) {
+				/*if (legalAction.getChilds() == null) {
 					List<LegalAction> legalActionList = game.getLegalActions(PLAYER);
 					legalAction.setChilds(legalActionList);
 				}
 				
 				LegalAction nextLegalAction = IA.playRandomIA(legalAction.getChilds());
+				*/
+				
+				List<LegalAction> legalActionList = game.getLegalActions(PLAYER, key);
+				LegalAction nextLegalAction = IA.playRandomIA(legalActionList);
 				if (nextLegalAction == null) { break; }
+				key = key + nextLegalAction.id;
 				LegalAction nextRollbackAction = simulateLegalAction(nextLegalAction);
 				rollbacks.push(nextRollbackAction);
+				statistics[NUM_TURN][0][initialLegalAction.getId()].setFitness(game.fitness(PLAYER));
 				
 				//initialLegalAction.setFitness((game.fitness(PLAYER)));
 				
@@ -270,7 +279,9 @@ class Game {
 		}
 	}
 	
-	public List<LegalAction> getLegalActions(int playerId) {
+	public List<LegalAction> getLegalActions(int playerId, String key) {
+		
+		if (Player.actionMap.containsKey(key)) { return Player.actionMap.get(key); }
 		
 		List<LegalAction> legalActions = new ArrayList<LegalAction>();
 		Pawn[] pawns = this.humans[playerId].getPawns();
@@ -314,6 +325,7 @@ class Game {
 			}
 		}
 		
+		Player.actionMap.put(key, legalActions);
 		return legalActions;
 	}
 	
@@ -542,6 +554,9 @@ class Engine {
 
 }
 
+interface Node {
+	
+}
 
 class LegalAction {
 	int id;
