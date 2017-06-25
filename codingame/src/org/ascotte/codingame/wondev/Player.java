@@ -7,6 +7,8 @@ import java.util.Random;
 import java.util.Scanner;
 import java.util.Stack;
 
+import sun.security.util.LegacyAlgorithmConstraints;
+
 class Utils {
 	final static StringBuilder buffer = new StringBuilder();
 	
@@ -38,7 +40,10 @@ class Player {
 	final static int PLAYER = 0;
 	final static int OPPONENT = 1;
 	final static int MAX_SIMULATIONS = 1000;
-	final static int SIMULATION_LENGTH = 3;
+	final static int SIMULATION_LENGTH = 0;
+	final static int MAX_TURN = 400;
+	static int NUM_TURN = 0;
+	static Statistics[][][] statistics = new Statistics[MAX_TURN][SIMULATION_LENGTH + 1][Game.LEGAL_ACTIONS.length];
 	
 	public static void main(String args[]) {
 		Scanner in = new Scanner(System.in);
@@ -47,6 +52,13 @@ class Player {
 
 		// init game
 		game.initGame(gridSize, nbPawnsByHuman);
+		for (int i = 0; i < MAX_TURN; i++) {
+			for (int j = 0; j < SIMULATION_LENGTH + 1; j++) {
+				for (int k = 0; k < Game.LEGAL_ACTIONS.length; k++) {
+					statistics[i][j][k] = new Statistics();
+				}
+			}
+		}
 		
 		// game loop
 		while (true) {
@@ -96,22 +108,23 @@ class Player {
 			
 			long debut = System.currentTimeMillis();
 			List<LegalAction> legalActionList= new ArrayList<>();
-			legalActionList = game.getLegalActions(PLAYER, 0);
-			legalActionList.addAll(game.getLegalActions(PLAYER, 1));
+			legalActionList = game.getLegalActions(PLAYER);
 			Utils.debug("Nombre actions " + legalActionList.size() + " / " + legalActions);
-			
-			LegalAction.globalAverageFitness = 0;
-			LegalAction.globalNumberFitness = 0;
-			
+	
 			simulate(legalActionList);
-			chooseBest(legalActionList);
+			chooseBest();
+			
 			long end = System.currentTimeMillis();
 			Utils.debug("Duration = " + (end - debut));
 			
 			for (LegalAction legalAction:legalActionList) {
 				Utils.debug("Average " + legalAction.pawnId + " " + legalAction.moveTo + " " + 
-			      legalAction.buildTo + " = " + legalAction.numberFitness + "/" + legalAction.fitness + "/" + legalAction.averageFitness);
+			      legalAction.buildTo + " = " + statistics[NUM_TURN][0][legalAction.getId()].getNumberFitness() 
+			      + "/" + statistics[NUM_TURN][0][legalAction.getId()].getFitness() 
+			      + "/" + statistics[NUM_TURN][0][legalAction.getId()].getAverageFitness());
 			}
+			
+			NUM_TURN++;
 		}
 	}
 	
@@ -122,22 +135,19 @@ class Player {
 		// Choose and play a random action
 		for (int i = 0; i < MAX_SIMULATIONS; i++) {
 			LegalAction initialLegalAction;
-			if (i < 500) {
-				initialLegalAction = IA.playRandomIA(initialLegalActionList);
-			}
-			else {
-				initialLegalAction = IA.playSelectiveIA(initialLegalActionList);
-			}
+			initialLegalAction = IA.playRandomIA(initialLegalActionList);
+			
 			rollbackAction = simulateLegalAction(initialLegalAction);
 			rollbacks.push(rollbackAction);
 			
-			initialLegalAction.setFitness((game.fitness(PLAYER)));
+			statistics[NUM_TURN][0][initialLegalAction.getId()].setFitness(game.fitness(PLAYER));
 			
 			// Play opponent
 			LegalAction legalAction;
+			legalAction = initialLegalAction;
+			/*
 			if (initialLegalAction.getChilds() == null) {
-				List<LegalAction> opponentLegalActionList = game.getLegalActions(OPPONENT, 0);
-				opponentLegalActionList.addAll(game.getLegalActions(OPPONENT, 1));
+				List<LegalAction> opponentLegalActionList = game.getLegalActions(OPPONENT);
 				initialLegalAction.setChilds(opponentLegalActionList);
 			}
 			LegalAction opponentLegalAction = IA.playRandomIA(initialLegalAction.getChilds());
@@ -149,14 +159,13 @@ class Player {
 			else {
 				legalAction = initialLegalAction;
 				legalAction.setChilds(null);
-			}
+			}*/
 			
 			// Then explore
 			for (int j = SIMULATION_LENGTH; j > 0; j--) {
 				// If childs not defined
 				if (legalAction.getChilds() == null) {
-					List<LegalAction> legalActionList = game.getLegalActions(PLAYER, 0);
-					legalActionList.addAll(game.getLegalActions(PLAYER, 1));
+					List<LegalAction> legalActionList = game.getLegalActions(PLAYER);
 					legalAction.setChilds(legalActionList);
 				}
 				
@@ -165,7 +174,7 @@ class Player {
 				LegalAction nextRollbackAction = simulateLegalAction(nextLegalAction);
 				rollbacks.push(nextRollbackAction);
 				
-				initialLegalAction.setFitness((game.fitness(PLAYER)));
+				//initialLegalAction.setFitness((game.fitness(PLAYER)));
 				
 				legalAction = nextLegalAction;
 			}
@@ -176,22 +185,21 @@ class Player {
 		}
 	}
 	
-	public static void chooseBest(List<LegalAction> initialLegalActionList)
+	public static void chooseBest()
 	{
-		LegalAction bestLegalAction = null;
-		for (LegalAction legalAction:initialLegalActionList) {
-			if (bestLegalAction == null) { bestLegalAction = legalAction; continue; }
-			if (legalAction.getFitness() > bestLegalAction.getFitness()) {
-				bestLegalAction = legalAction;
+		int bestIndex = 0;		
+		for (int index = 0; index < statistics[NUM_TURN][0].length; index++) {
+			if (statistics[NUM_TURN][0][index].getFitness() > statistics[NUM_TURN][0][bestIndex].getFitness()) {
+				bestIndex = index;
 			}
-			else if (legalAction.getFitness() == bestLegalAction.getFitness()) {
-				if (legalAction.getAverageFitness() > bestLegalAction.getAverageFitness()) {
-					bestLegalAction = legalAction;
+			else if (statistics[NUM_TURN][0][index].getFitness() == statistics[NUM_TURN][0][bestIndex].getFitness()) {
+				if (statistics[NUM_TURN][0][index].getAverageFitness() > statistics[NUM_TURN][0][bestIndex].getAverageFitness()) {
+					bestIndex = index;
 				}
 			}
 		}
 		
-		publishLegalAction(bestLegalAction);
+		publishLegalAction(Game.LEGAL_ACTIONS[bestIndex]);
 	}
 	
 	public static void publishLegalAction(LegalAction legalAction) {
@@ -201,7 +209,14 @@ class Player {
 	public static LegalAction simulateLegalAction(LegalAction legalAction) {
 		
 		game.playLegalAction(legalAction);
-		return legalAction.getReverse();
+		LegalAction reverseLegalAction = game.getLegalAction
+				(legalAction.getPlayerIndex(), 
+					legalAction.getPawnId(), 
+					legalAction.getReverseCommand(),
+					legalAction.getReverseMoveTo(), 
+					legalAction.getBuildTo());
+				
+		return reverseLegalAction;
 	}
 }
 
@@ -209,14 +224,20 @@ class Player {
 class Game {
 	final Grid grid = new Grid();
 	final Human[] humans = new Human[2];
+	final static int PLAYER_NUMBER = 2;
+	final static int PAWN_NUMBER = 2;
+	final static int DIRECTION_NUMBER = 8;
+	final static int COMMAND_NUMBER = 2;
+	static LegalAction[] LEGAL_ACTIONS = new LegalAction[PLAYER_NUMBER * PAWN_NUMBER * COMMAND_NUMBER * DIRECTION_NUMBER * DIRECTION_NUMBER];
 	
 	public void initGame(int gridSize, int nbPawnsByHuman) {
 		this.grid.createGrid(gridSize);
 		for (int i = 0; i < humans.length; i++) {
 			this.humans[i] = new Human(nbPawnsByHuman);
 		}
+		this.createLegalActions();
 	}
-	
+
 	public Grid getGrid() {
 		return this.grid;
 	}
@@ -249,36 +270,50 @@ class Game {
 		}
 	}
 	
-	public List<LegalAction> getLegalActions(int playerId, int pawnId) {
+	public List<LegalAction> getLegalActions(int playerId) {
 		
 		List<LegalAction> legalActions = new ArrayList<LegalAction>();
-		Pawn pawn = this.humans[playerId].getPawn(pawnId);
-		Cell currentCell = pawn.getLocation();
-		if (currentCell == null) { return legalActions; }
-		
-		for (int i = 0; i < 8; i++) {
-			Direction moveDirection = Direction.get(i);
-			Cell targetCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, moveDirection);
-			// Move is not possible
-			if (targetCell == null || !targetCell.isReachable(currentCell.height)) {
-				//Utils.debug("Move not possible " + moveDirection + " " + currentCell.width + " " + currentCell.length);
-				continue;
-			}
-		
-			// Move is possible
-			for (int j = 0; j < 8; j++) {
-				Direction buildDirection = Direction.get(j);
-				Cell buildCell = this.grid.getNeighbourgCell(targetCell.width, targetCell.length, buildDirection);
-				// Build is not possible
-				if (buildCell == null || !buildCell.isBuildable(pawn)) {
-					//Utils.debug("Build not possible " + buildDirection + " " + targetCell.width + " " + targetCell.length);
+		Pawn[] pawns = this.humans[playerId].getPawns();
+	
+		// For each pawn
+		for (int pawnId = 0; pawnId < pawns.length; pawnId++) {
+			Pawn pawn = pawns[pawnId];
+			// If pawn already out
+			if (!pawn.isActive() || pawn.getLocation() == null) { continue; }
+			int nbLegalActionForPawn = 0;
+			
+			Cell currentCell = pawn.getLocation();
+			for (int i = 0; i < DIRECTION_NUMBER; i++) {
+				Direction moveDirection = Direction.get(i);
+				Cell targetCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, moveDirection);
+				// Move is not possible
+				if (targetCell == null || !targetCell.isReachable(currentCell.height)) {
+					//Utils.debug("Move not possible " + moveDirection + " " + currentCell.width + " " + currentCell.length);
 					continue;
-					}
-				
-				// Build is possible
-				legalActions.add(new LegalAction(Command.MOVEBUILD, playerId, pawnId, moveDirection, buildDirection));
+				}
+			
+				// Move is possible
+				for (int j = 0; j < DIRECTION_NUMBER; j++) {
+					Direction buildDirection = Direction.get(j);
+					Cell buildCell = this.grid.getNeighbourgCell(targetCell.width, targetCell.length, buildDirection);
+					// Build is not possible
+					if (buildCell == null || !buildCell.isBuildable(pawn)) {
+						//Utils.debug("Build not possible " + buildDirection + " " + targetCell.width + " " + targetCell.length);
+						continue;
+						}
+					
+					// Build is possible
+					legalActions.add(getLegalAction(playerId, pawnId, Command.MOVEBUILD, moveDirection, buildDirection));
+					nbLegalActionForPawn++;
+				}
+			}
+			
+			// If no action, kill pawn
+			if (nbLegalActionForPawn == 0) {
+				pawn.inactive();
 			}
 		}
+		
 		return legalActions;
 	}
 	
@@ -292,13 +327,16 @@ class Game {
 		Cell buildCell = null;
 		Direction moveDirection = legalAction.getMoveTo();
 		Direction buildDirection = legalAction.getBuildTo();
-		
 		switch(legalAction.getCommand()) {
 		case MOVEBUILD:
 			targetCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, moveDirection);
 			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length);
 			this.markScore(playerId, pawnId, 1);
 			buildCell = this.grid.getNeighbourgCell(targetCell.width, targetCell.length, buildDirection);
+			if (buildCell == null) {
+				Utils.debug(legalAction.toString() + " " + currentCell.width + "/" + currentCell.length);
+				Utils.debug(legalAction.toString() + " " + targetCell.width + "/" + targetCell.length);
+			}
 			buildCell.upHeight();
 			break;
 		case UNBUILDMOVE:
@@ -316,6 +354,34 @@ class Game {
 		Pawn pawn = human.getPawn(0);
 		int fitness = 5 * human.getScore() + pawn.getLocation().height;
 		return fitness;
+	}
+	
+	public void createLegalActions() {
+		for (int playerId = 0; playerId < PLAYER_NUMBER; playerId++) {
+			for (int pawnId = 0; pawnId < PAWN_NUMBER; pawnId++) {
+				for (int commandId = 0; commandId < COMMAND_NUMBER; commandId++) {
+					for (int moveId = 0; moveId < DIRECTION_NUMBER; moveId++) {
+						for (int buildId = 0; buildId < DIRECTION_NUMBER; buildId++) {
+							int index = playerId * PAWN_NUMBER * COMMAND_NUMBER * DIRECTION_NUMBER * DIRECTION_NUMBER
+									+ pawnId * COMMAND_NUMBER * DIRECTION_NUMBER * DIRECTION_NUMBER
+									  + commandId * DIRECTION_NUMBER * DIRECTION_NUMBER
+									    + moveId * DIRECTION_NUMBER
+									      + buildId;
+							LEGAL_ACTIONS[index] = new LegalAction(index, Command.get(commandId), playerId, pawnId, Direction.get(moveId), Direction.get(buildId));
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	public LegalAction getLegalAction(int playerId, int pawnId, Command command, Direction move, Direction build) {
+		int index = playerId * PAWN_NUMBER * COMMAND_NUMBER * DIRECTION_NUMBER * DIRECTION_NUMBER
+				+ pawnId * COMMAND_NUMBER * DIRECTION_NUMBER * DIRECTION_NUMBER
+				  + Command.toInteger(command) * DIRECTION_NUMBER * DIRECTION_NUMBER
+				    + Direction.toInteger(move) * DIRECTION_NUMBER
+				      + Direction.toInteger(build);
+		return LEGAL_ACTIONS[index];
 	}
 }
 
@@ -438,6 +504,10 @@ class Human {
 		return this.pawn[pawnId];
 	}
 	
+	public Pawn[] getPawns() {
+		return this.pawn;
+	}
+	
 	public void addToScore(int increment) {
 		this.score += increment;
 	}
@@ -449,6 +519,7 @@ class Human {
 
 class Pawn {
 	Cell location = null;
+	boolean isActive = true;
 	
 	public void setLocation(Cell location) {
 		this.location = location;
@@ -457,6 +528,14 @@ class Pawn {
 	public Cell getLocation() {
 		return this.location;
 	}
+	
+	public void inactive() {
+		this.isActive = true;
+	}
+	
+	public boolean isActive() {
+		return this.isActive;
+	}
 }
 
 class Engine {
@@ -464,29 +543,30 @@ class Engine {
 }
 
 
-class LegalAction implements Comparable<LegalAction> {
-	static double globalAverageFitness = 0;
-	static double globalNumberFitness = 0;
+class LegalAction {
+	int id;
 	Command command;
 	int playerIndex;
 	int pawnId;
 	Direction moveTo;
 	Direction buildTo;
-	int fitness = 0;
-	double averageFitness = 0;
-	int numberFitness = 0;
 	List<LegalAction> childs;
 	
-	LegalAction(Command command, int playerIndex, int pawnId, Direction moveTo, Direction buildTo) {
+	LegalAction(int id, Command command, int playerIndex, int pawnId, Direction moveTo, Direction buildTo) {
 		this.command = command;
 		this.playerIndex = playerIndex;
 		this.pawnId = pawnId;
 		this.moveTo = moveTo;
 		this.buildTo = buildTo;
+		this.id = id;
 	}
 	
 	public Command getCommand() {
 		return this.command;
+	}
+	
+	public int getId() {
+		return this.id;
 	}
 	
 	public int getPlayerIndex() {
@@ -505,19 +585,14 @@ class LegalAction implements Comparable<LegalAction> {
 		return this.buildTo;
 	}
 	
-	public int getFitness() {
-		return this.fitness;
-	}
-	
-	public double getAverageFitness() {
-		return this.averageFitness;
-	}
-	
-	public LegalAction getReverse() {
+	public Command getReverseCommand() {
 		Command command = Command.getReverse(this.command);
+		return command;
+	}
+	
+	public Direction getReverseMoveTo() {
 		Direction moveTo = Direction.getReverse(this.moveTo);
-		LegalAction legalAction = new LegalAction(command, this.playerIndex, this.pawnId, moveTo, this.buildTo);
-		return legalAction;
+		return moveTo;
 	}
 	
 	public void setChilds(List<LegalAction> legalActionList) {
@@ -527,28 +602,33 @@ class LegalAction implements Comparable<LegalAction> {
 	public List<LegalAction> getChilds() {
 		return this.childs;
 	}
+
+	public String toString() {
+		return this.command.name() + " " + this.playerIndex + " " + this.pawnId + " " + this.moveTo.name() + " " + this.buildTo.name();
+	}
+}
+
+class Statistics {
+	int fitness = 0;
+	int averageFitness = 0;
+	int numberFitness = 0;
 	
 	public void setFitness(int fitness) {
 		this.fitness = Math.max(this.fitness, fitness);
 		this.averageFitness = ((this.averageFitness * this.numberFitness) + fitness) / (this.numberFitness + 1);
 		this.numberFitness++;
-		globalAverageFitness = ((globalAverageFitness * globalNumberFitness) + fitness) / (globalNumberFitness + 1);
-		globalNumberFitness++;
 	}
 	
-	public String toString() {
-		return this.command.name() + " " + this.playerIndex + " " + this.pawnId + " " + this.moveTo.name() + " " + this.buildTo.name();
+	public int getFitness() {
+		return this.fitness;
 	}
 	
-	public int compareTo(LegalAction legalAction) {
-		if (this.averageFitness > legalAction.averageFitness) {
-			return -1;
-		}
-		else if (this.averageFitness < legalAction.averageFitness) {
-			return 1;
-		}
-		return 0;
-		
+	public int getAverageFitness() {
+		return this.averageFitness;
+	}
+	
+	public int getNumberFitness() {
+		return this.numberFitness;
 	}
 }
 
@@ -601,6 +681,22 @@ enum Command {
 		else return null;
 	}
 	
+	public static Command get(int index) {
+		switch(index) {
+		case 0: return Command.MOVEBUILD;
+		case 1: return Command.UNBUILDMOVE;
+		}
+		return null;
+	}
+	
+	public static int toInteger(Command command) {
+		switch(command) {
+		case MOVEBUILD: return 0;
+		case UNBUILDMOVE: return 1;
+		}
+		return -1;
+	}
+	
 	public static Command getReverse(Command command) {
 		if (MOVEBUILD.equals(command)) {
 			return Command.UNBUILDMOVE;
@@ -626,6 +722,20 @@ enum Direction {
 		case 7: return NW;
 		}
 		return null;
+	}
+	
+	public static int toInteger(Direction direction) {
+		switch(direction) {
+		case N: return 0;
+		case NE: return 1;
+		case E: return 2;
+		case SE: return 3;
+		case S: return 4;
+		case SW: return 5;
+		case W: return 6;
+		case NW: return 7;
+		}
+		return -1;
 	}
 	
 	public static Direction getReverse(Direction direction) {
