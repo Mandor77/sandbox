@@ -50,6 +50,7 @@ class Player {
 		
 		// game loop
 		while (true) {
+			
 			for (int j = 0; j < gridSize; j++) {
 				String row = in.next();
 				for (int i = 0; i < row.length(); i++) {
@@ -71,17 +72,20 @@ class Player {
 					}
 				}
 			}
+			
 			for (int i = 0; i < nbPawnsByHuman; i++) {
 				int unitX = in.nextInt();
 				int unitY = in.nextInt();
-				game.setPawnLocation(PLAYER, i, unitX, unitY, false);
+				game.setPawnLocation(PLAYER, i, unitX, unitY);
 			}
+			
 			for (int i = 0; i < nbPawnsByHuman; i++) {
 				int otherX = in.nextInt();
 				int otherY = in.nextInt();
-				game.setPawnLocation(OPPONENT, i, otherX, otherY, false);
+				game.setPawnLocation(OPPONENT, i, otherX, otherY);
 			}
 			
+			//TODO : use it for first iteration
 			int legalActions = in.nextInt();
 			for (int i = 0; i < legalActions; i++) {
 				String atype = in.next();
@@ -217,26 +221,31 @@ class Game {
 		return this.grid;
 	}
 	
-	public void setPawnLocation(int playerId, int pawnId, int x, int y, boolean rollback) {
-		// If not visible cancel
+	public void setPawnLocation(int playerId, int pawnId, int x, int y) {
+		
+		// In case of the pawn is not visible
 		if (x == -1 || y == -1) { return; }
-		Cell cell = this.grid.getCell(x, y);
+		
+		Cell newLocation = this.grid.getCell(x, y);
 		Human human = this.humans[playerId];
 		Pawn pawn = human.getPawn(pawnId);
-		// Remove current pawn location
 		Cell currentLocation = pawn.getLocation();
+		
+		// Remove pawn from its current location
 		if (currentLocation != null) {
 			currentLocation.removePawn();
 		}
-		cell.addPawn(pawn);
-		pawn.setLocation(cell);
 		
-		// Scoring
-		if (!rollback && cell.height == 3) {
-			human.addToScore(1);
-		}
-		else if (rollback && currentLocation !=null && currentLocation.height == 3) {
-			human.addToScore(-1);
+		// Put pawn to its new location
+		newLocation.addPawn(pawn);
+		pawn.setLocation(newLocation);
+	}
+	
+	public void markScore(int playerId, int pawnId, int score) {
+		Human human = this.humans[playerId];
+		Pawn pawn = human.getPawn(pawnId);
+		if (pawn.getLocation().height == 3) {
+			human.addToScore(score);
 		}
 	}
 	
@@ -287,15 +296,17 @@ class Game {
 		switch(legalAction.getCommand()) {
 		case MOVEBUILD:
 			targetCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, moveDirection);
-			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length, false);
+			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length);
+			this.markScore(playerId, pawnId, 1);
 			buildCell = this.grid.getNeighbourgCell(targetCell.width, targetCell.length, buildDirection);
 			buildCell.upHeight();
 			break;
 		case UNBUILDMOVE:
 			buildCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, buildDirection);
 			buildCell.downHeight();
+			this.markScore(playerId, pawnId, -1);
 			targetCell = this.grid.getNeighbourgCell(currentCell.width, currentCell.length, moveDirection);
-			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length, true);
+			this.setPawnLocation(playerId, pawnId, targetCell.width, targetCell.length);
 			break;
 		}
 	}
