@@ -129,8 +129,25 @@ class Player {
 			
 			initialLegalAction.setFitness((game.fitness(PLAYER)));
 			
+			// Play opponent
+			LegalAction legalAction;
+			if (initialLegalAction.getChilds() == null) {
+				List<LegalAction> opponentLegalActionList = game.getLegalActions(OPPONENT, 0);
+				opponentLegalActionList.addAll(game.getLegalActions(OPPONENT, 1));
+				initialLegalAction.setChilds(opponentLegalActionList);
+			}
+			LegalAction opponentLegalAction = IA.playRandomIA(initialLegalAction.getChilds());
+			if (opponentLegalAction != null) {
+				LegalAction opponentNextRollbackAction = simulateLegalAction(opponentLegalAction);
+				rollbacks.push(opponentNextRollbackAction);
+				legalAction = opponentLegalAction;
+			}
+			else {
+				legalAction = initialLegalAction;
+				legalAction.setChilds(null);
+			}
+			
 			// Then explore
-			LegalAction legalAction = initialLegalAction;
 			for (int j = SIMULATION_LENGTH; j > 0; j--) {
 				// If childs not defined
 				if (legalAction.getChilds() == null) {
@@ -228,6 +245,7 @@ class Game {
 		List<LegalAction> legalActions = new ArrayList<LegalAction>();
 		Pawn pawn = this.humans[playerId].getPawn(pawnId);
 		Cell currentCell = pawn.getLocation();
+		if (currentCell == null) { return legalActions; }
 		
 		for (int i = 0; i < 8; i++) {
 			Direction moveDirection = Direction.get(i);
