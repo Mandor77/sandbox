@@ -295,84 +295,45 @@ class Game {
 			break;
 		}
 	}
-
-	public double evalOld(boolean noMoreLegalMove) {
-		Human player = this.humans[Player.PLAYER];
-		Human opponent = this.humans[Player.OPPONENT];
-		double fitness = 0;
-		for (int i = 0; i < player.nbPawns; i++) {
-			fitness += player.getPawn(i).getLocation().height;
-		}
-		fitness += (player.getScore() * 5) - (opponent.getScore() * 5);
-		if (noMoreLegalMove) {
-			fitness -= 100;
-		}
-		return fitness;
-	}
 	
 	public double eval(boolean noMoreLegalMove) {
 		Human player = this.humans[Player.PLAYER];
 		Human opponent = this.humans[Player.OPPONENT];
 		
-		double totalMyHeight = 0;
-		double meanMyHeight = 0;
-		int myFactor = 0;
+		int fitness = 0;
 		
 		for (int i = 0; i < player.nbPawns; i++) {
 			Pawn pawn = player.getPawn(i);
 			if (!pawn.isActive()) { continue; }
 			Cell currentCell = pawn.getLocation();
 			if (currentCell != null) {
-				totalMyHeight += (pawn.getLocation().height * 4);
-				myFactor += 4;
+				fitness += (pawn.getLocation().height * 4);
 				for (int j = 0; j < Game.DIRECTION_NUMBER; j++) {
 					Cell targetCell = this.grid.getNeighbourg(currentCell, Direction.get(j));
 					if (targetCell != null && targetCell.isReachable() && targetCell.isMovable(pawn.getLocation().height)) {
-						totalMyHeight += targetCell.height;
-						myFactor++;
+						fitness += targetCell.height;
 					}
 				}
 			}
 		}
-		
-		if (myFactor != 0) {
-			meanMyHeight = totalMyHeight / myFactor;
-		}
-		
-		
-		double totalOpponentHeight = 0;
-		double meanOpponentHeight = 0;
-		int opponentFactor = 0;
-		
+
 		for (int i = 0; i < opponent.nbPawns; i++) {
 			Pawn pawn = opponent.getPawn(i);
 			if (!pawn.isActive()) { continue; }
 			Cell currentCell = pawn.getLocation();
 			if (currentCell != null) {
-				totalOpponentHeight += (pawn.getLocation().height * 4);
-				opponentFactor += 4;
+				fitness -= (pawn.getLocation().height * 4);
 				for (int j = 0; j < Game.DIRECTION_NUMBER; j++) {
 					Cell targetCell = this.grid.getNeighbourg(currentCell, Direction.get(j));
 					if (targetCell != null && targetCell.isReachable() && targetCell.isMovable(pawn.getLocation().height)) {
-						totalOpponentHeight += targetCell.height;
-						opponentFactor++;
+						fitness -= targetCell.height;
 					}
 				}
 			}
 		}
 		
-		if (opponentFactor != 0) {
-			meanOpponentHeight = totalOpponentHeight / opponentFactor;
-		}
-		
-		
-		double fitness = (meanMyHeight - (meanOpponentHeight/2))*1.33;
-		
-		int deltaScore = player.getScore() - opponent.getScore();
-		fitness += deltaScore;
-		
 		if (noMoreLegalMove) {
-			fitness -= 10;
+			fitness -= 100;
 		}
 		return fitness;
 	}
