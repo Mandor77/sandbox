@@ -2,6 +2,7 @@ package org.ascotte.codingame.wondev.second;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Scanner;
 
 class Utils {
@@ -120,6 +121,7 @@ class Game {
 	public List<Move> getLegalMoves(int playerId) {
 		
 		List<Move> legalMoves = new ArrayList<Move>();
+		PriorityQueue<Cell> cellQueue = new PriorityQueue<Cell>();
 		Pawn[] pawns = this.humans[playerId].getPawns();
 		boolean isMovable = false;
 		boolean isPushable = false;
@@ -135,11 +137,23 @@ class Game {
 			for (int i = 0; i < DIRECTION_NUMBER; i++) {
 				Direction moveDirection = Direction.get(i);
 				Cell targetCell = this.grid.getNeighbourg(currentCell, moveDirection);
-				// Move is not possible
-				if (targetCell == null || !targetCell.isReachable()) {
-					//Utils.debug("Move not possible " + moveDirection + " " + currentCell.width + " " + currentCell.length);
-					continue;
+				if (targetCell != null && targetCell.isReachable()) { 
+					cellQueue.add(targetCell); 
+					targetCell.setFromDirection(moveDirection);
 				}
+			}
+			
+			while (!cellQueue.isEmpty()) 
+			{
+				Cell targetCell = cellQueue.poll();
+				Direction moveDirection = targetCell.getFromDirection();
+				//Cell targetCell = this.grid.getNeighbourg(currentCell, moveDirection);
+				// Move is not possible
+				//if (targetCell == null || !targetCell.isReachable()) {
+					//Utils.debug("Move not possible " + moveDirection + " " + currentCell.width + " " + currentCell.length);
+				//	continue;
+				//}
+				
 				isMovable = targetCell.isMovable(currentCell.height);
 				isPushable = targetCell.isPushable(pawn);
 				if (!isMovable && !isPushable) { continue; }
@@ -370,15 +384,20 @@ class Game {
 class Logic {
 
 	Game game;
-	final static int MAX_DEPTH = 3;
+	static int MAX_DEPTH = 3; 
+	static int NB_TRY = 0;
+	static int NB_ALPHA = 0;
+	static int NB_BETA = 0;
 	
 	public Logic(Game game) {
 		this.game = game;
 	}
 	
 	public void play(int legalMoveNumber) {
-				
+		
+		MAX_DEPTH = 4;
 		double value = minimax(MAX_DEPTH, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, true);
+		Utils.debug("TRY=" + NB_TRY + " ALPHA=" + NB_ALPHA + " BETA=" + NB_BETA);
 	}
 	
 	public double minimax(int depth, double alpha, double beta, boolean maximizingPlayer) {
@@ -386,13 +405,15 @@ class Logic {
 		List<Move> legalMoves = null;
 		
 		if (depth == 0) {
+			NB_TRY++;
 			return game.eval(false);
 		}
 
+		int nbMove = 0;
 		double bestValue = 0d;
 		Move bestMove = null;
 		long start = 0, end = 0;
-		if (depth == MAX_DEPTH) {
+		if (depth > MAX_DEPTH-1) {
 			start = System.nanoTime();
 		}
 		
@@ -402,6 +423,13 @@ class Logic {
 			legalMoves = game.getLegalMoves(Player.OPPONENT);
 			if (legalMoves.isEmpty()) {return game.eval(true);}
 			for (Move move : legalMoves) {
+				if (depth > MAX_DEPTH-1) {
+					end = System.nanoTime();
+					if ((end - start) > 42000000) {
+						Utils.debug("Force break after " + nbMove);
+						break;
+					}
+				}
 				game.simulate(move);
 				double value = minimax(depth - 1, alpha, beta, true);
 				if (value < bestValue) {
@@ -410,6 +438,7 @@ class Logic {
 				}
 				game.rollback(move);
 				if (alpha > bestValue) {
+					NB_ALPHA++;
 					break;
 				}
 				beta = Math.min(beta, bestValue);
@@ -419,26 +448,30 @@ class Logic {
 		// max
 		else {
 			bestValue = Double.NEGATIVE_INFINITY;
-			int nbMove = 0;
+			nbMove = 0;
 			legalMoves = game.getLegalMoves(Player.PLAYER);
 			if (legalMoves.isEmpty()) {return game.eval(true);}
 			for (Move move : legalMoves) {
 				nbMove++;
 				if (depth == MAX_DEPTH) {
+					Utils.debug(move.toString());
+				}
+				if (depth > MAX_DEPTH-1) {
 					end = System.nanoTime();
-					if ((end - start) > 45000000) {
+					if ((end - start) > 42000000) {
 						Utils.debug("Force break after " + nbMove);
 						break;
 					}
 				}
 				game.simulate(move);
-				double value = minimax(depth - 1, alpha, beta, true);
+				double value = minimax(depth - 1, alpha, beta, false);
 				if (value > bestValue) {
 					bestValue = value;
 					bestMove = move;
 				}
 				game.rollback(move);
 				if (beta < bestValue) {
+					NB_BETA++;
 					break;
 				}
 				alpha = Math.max(alpha, bestValue);
@@ -485,16 +518,25 @@ class Grid {
 	}
 }
 
-class Cell {
+class Cell implements Comparable<Cell> {
 	int height = 0; // -1 to 4
 	int x = 0;
 	int y = 0;
+	Direction fromDirection;
 	
 	Pawn pawn = null;
 	
 	public Cell(int x, int y) {
 		this.x = x;
 		this.y = y;
+	}
+	
+	public void setFromDirection(Direction direction) {
+		this.fromDirection = direction;
+	}
+	
+	public Direction getFromDirection() {
+		return this.fromDirection;
 	}
 	
 	public void setHeight(int height) {
@@ -542,6 +584,36 @@ class Cell {
 	
 	public void downHeight() {
 		if (this.height > -1) { this.height--; }
+	}
+
+	@Override
+	public int compareTo(Cell o) {
+		if (this.height < o.height) { return 1; }
+		if (this.height == o.height) { return 0; }
+		if (this.height > o.height) { return -1; } 
+		return 0;
+	}
+}
+
+class PriorityWrapper implements Comparable<PriorityWrapper>{
+	Cell targetCell;
+	Pawn pawn;
+	Direction moveTo;
+	int height;
+	
+	PriorityWrapper(Cell targetCell, Direction moveTo, Pawn pawn, int height) {
+		this.targetCell = targetCell;
+		this.pawn = pawn;
+		this.moveTo = moveTo;
+		this.height = height;
+	}
+	
+	@Override
+	public int compareTo(PriorityWrapper o) {
+		if (this.height < o.height) { return 1; }
+		if (this.height == o.height) { return 0; }
+		if (this.height > o.height) { return -1; } 
+		return 0;
 	}
 }
 
@@ -658,6 +730,7 @@ class Move {
 		return this.command.name() + " " + this.playerIndex + " " + this.pawnId + " " + this.moveTo.name() + " " + this.buildTo.name();
 	}
 }
+
 enum Command {
 	MOVE_AND_BUILD("MOVE&BUILD"), PUSH_AND_BUILD("PUSH&BUILD"), UNBUILD_AND_MOVE("UNBUILD&MOVE"), UNBUILD_AND_PULL("UNBUILD&PULL");
 	String name;
