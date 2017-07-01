@@ -85,18 +85,18 @@ class Player {
 				int index = in.nextInt();
 				String dir1 = in.next();
 				String dir2 = in.next();
-				//Utils.debug("Proposed action = " + atype + " " + index + " " + dir1 + " " + dir2);
+				Utils.debug("Proposed action = " + atype + " " + index + " " + dir1 + " " + dir2);
 			}
 			
 			long start = System.nanoTime();
 			List<Move> legalMoves = new ArrayList<>();
-			legalMoves = game.getLegalMoves(PLAYER);
+			legalMoves = game.getLegalMoves(PLAYER, true);
 			Utils.debug("Nombre actions " + legalMoves.size() + " / " + legalMoveNumber);
 			long intermediary = System.nanoTime();
 			Utils.debug("Duration = " + (intermediary - start));
-			/*for (Move move:legalMoves) {
+			for (Move move:legalMoves) {
 				Utils.debug("Action = " + move.toString());
-			}*/
+			}
 			
 			logic.play(legalMoveNumber);
 			
@@ -118,81 +118,89 @@ class Game {
 	final static int COMMAND_NUMBER = 2;
 	static Move[] MOVES = new Move[PLAYER_NUMBER * PAWN_NUMBER * COMMAND_NUMBER * DIRECTION_NUMBER * DIRECTION_NUMBER];
 	
-	public List<Move> getLegalMoves(int playerId) {
-		
+	public List<Move> getLegalMoves(int playerId, boolean DEBUG) {
+
 		List<Move> legalMoves = new ArrayList<Move>();
-		PriorityQueue<Cell> cellQueue = new PriorityQueue<Cell>();
+		PriorityQueue<PriorityWrapper> wrapperQueue = new PriorityQueue<PriorityWrapper>();
 		Pawn[] pawns = this.humans[playerId].getPawns();
 		boolean isMovable = false;
 		boolean isPushable = false;
-	
+
 		// For each pawn
 		for (int pawnId = 0; pawnId < pawns.length; pawnId++) {
 			Pawn pawn = pawns[pawnId];
 			// If pawn already out
-			if (!pawn.isActive() || pawn.getLocation() == null) { continue; }
-			int nbLegalActionForPawn = 0;
-			
+			if (!pawn.isActive() || pawn.getLocation() == null) {
+				if (DEBUG) {
+					Utils.debug("Pawn is died "+pawn.isActive());
+				}
+				continue;
+			}
+
 			Cell currentCell = pawn.getLocation();
 			for (int i = 0; i < DIRECTION_NUMBER; i++) {
 				Direction moveDirection = Direction.get(i);
 				Cell targetCell = this.grid.getNeighbourg(currentCell, moveDirection);
-				if (targetCell != null && targetCell.isReachable()) { 
-					cellQueue.add(targetCell); 
+				if (targetCell != null && targetCell.isReachable()) {
+					wrapperQueue.add(new PriorityWrapper(targetCell, moveDirection, pawn, targetCell.height));
 					targetCell.setFromDirection(moveDirection);
 				}
 			}
-			
-			while (!cellQueue.isEmpty()) 
-			{
-				Cell targetCell = cellQueue.poll();
-				Direction moveDirection = targetCell.getFromDirection();
-				//Cell targetCell = this.grid.getNeighbourg(currentCell, moveDirection);
-				// Move is not possible
-				//if (targetCell == null || !targetCell.isReachable()) {
-					//Utils.debug("Move not possible " + moveDirection + " " + currentCell.width + " " + currentCell.length);
-				//	continue;
-				//}
-				
-				isMovable = targetCell.isMovable(currentCell.height);
-				isPushable = targetCell.isPushable(pawn);
-				if (!isMovable && !isPushable) { continue; }
-				
-				// Move or push is possible
-				for (int j = 0; j < DIRECTION_NUMBER; j++) {
-					Direction buildDirection = Direction.get(j);
-					Cell buildCell = this.grid.getNeighbourg(targetCell, buildDirection);
-					// Build is not possible
-					if (buildCell == null || !buildCell.isBuildable(pawn)) {
-						//Utils.debug("Build not possible " + buildDirection + " " + targetCell.width + " " + targetCell.length);
-						continue;
-					}
-					
-					// If move and build is possible
-					if (isMovable) {
-						legalMoves.add(getMove(playerId, pawnId, Command.MOVE_AND_BUILD, moveDirection, buildDirection));
-						nbLegalActionForPawn++;
-					}
-					
-					if (isPushable) {
-						if ((buildDirection.id >= (8 + moveDirection.id - 1)%8 ) &&
-								buildDirection.id <= (8 + moveDirection.id + 1)%8) {
-							if (buildCell.isReachable() && buildCell.isMovable(targetCell.height)) {
-								legalMoves.add(getMove(playerId, pawnId, Command.PUSH_AND_BUILD, moveDirection, buildDirection));
-								nbLegalActionForPawn++;
-							}
+		}
+
+		while (!wrapperQueue.isEmpty()) {
+			PriorityWrapper wrapper = wrapperQueue.poll();
+			Cell targetCell = wrapper.getTargetCell();
+			Direction moveDirection = wrapper.getMoveTo();
+			Pawn pawn = wrapper.getPawn();
+			Cell currentCell = pawn.getLocation();
+
+			// Cell targetCell = this.grid.getNeighbourg(currentCell,
+			// moveDirection);
+			// Move is not possible
+			// if (targetCell == null || !targetCell.isReachable()) {
+			// Utils.debug("Move not possible " + moveDirection + " " +
+			// currentCell.width + " " + currentCell.length);
+			// continue;
+			// }
+
+			isMovable = targetCell.isMovable(currentCell.height);
+			isPushable = targetCell.isPushable(pawn);
+			if (!isMovable && !isPushable) {
+				continue;
+			}
+
+			// Move or push is possible
+			for (int j = 0; j < DIRECTION_NUMBER; j++) {
+				Direction buildDirection = Direction.get(j);
+				Cell buildCell = this.grid.getNeighbourg(targetCell, buildDirection);
+				// Build is not possible
+				if (buildCell == null || !buildCell.isBuildable(pawn)) {
+					// Utils.debug("Build not possible " + buildDirection + " "
+					// + targetCell.width + " " + targetCell.length);
+					continue;
+				}
+
+				// If move and build is possible
+				if (isMovable) {
+					legalMoves.add(
+							getMove(playerId, pawn.getId(), Command.MOVE_AND_BUILD, moveDirection, buildDirection));
+				}
+
+				if (isPushable) {
+					if ((buildDirection.id >= (8 + moveDirection.id - 1) % 8)
+							&& buildDirection.id <= (8 + moveDirection.id + 1) % 8) {
+						if (buildCell.isReachable() && buildCell.isMovable(targetCell.height)) {
+							legalMoves.add(getMove(playerId, pawn.getId(), Command.PUSH_AND_BUILD, moveDirection,
+									buildDirection));
 						}
 					}
 				}
 			}
-			
-			// If no action, kill pawn
-			if (nbLegalActionForPawn == 0) {
-				pawn.inactive();
-			}
 		}
 
 		return legalMoves;
+
 	}
 	
 	public void initGame(int gridSize, int nbPawnsByHuman) {
@@ -413,23 +421,16 @@ class Logic {
 		double bestValue = 0d;
 		Move bestMove = null;
 		long start = 0, end = 0;
-		if (depth > MAX_DEPTH-1) {
+		if (depth > MAX_DEPTH-2) {
 			start = System.nanoTime();
 		}
 		
 		// min
 		if (!maximizingPlayer) {
 			bestValue = Double.POSITIVE_INFINITY;
-			legalMoves = game.getLegalMoves(Player.OPPONENT);
+			legalMoves = game.getLegalMoves(Player.OPPONENT, false);
 			if (legalMoves.isEmpty()) {return game.eval(true);}
 			for (Move move : legalMoves) {
-				if (depth > MAX_DEPTH-1) {
-					end = System.nanoTime();
-					if ((end - start) > 42000000) {
-						Utils.debug("Force break after " + nbMove);
-						break;
-					}
-				}
 				game.simulate(move);
 				double value = minimax(depth - 1, alpha, beta, true);
 				if (value < bestValue) {
@@ -442,26 +443,25 @@ class Logic {
 					break;
 				}
 				beta = Math.min(beta, bestValue);
+				if (depth > MAX_DEPTH-2) {
+					end = System.nanoTime();
+					if ((end - start) > 42000000) {
+						Utils.debug("Force break after " + nbMove);
+						break;
+					}
+				}
 			}
 		}
 
 		// max
 		else {
 			bestValue = Double.NEGATIVE_INFINITY;
-			nbMove = 0;
-			legalMoves = game.getLegalMoves(Player.PLAYER);
+			legalMoves = game.getLegalMoves(Player.PLAYER, false);
 			if (legalMoves.isEmpty()) {return game.eval(true);}
 			for (Move move : legalMoves) {
-				nbMove++;
+				
 				if (depth == MAX_DEPTH) {
-					Utils.debug(move.toString());
-				}
-				if (depth > MAX_DEPTH-1) {
-					end = System.nanoTime();
-					if ((end - start) > 42000000) {
-						Utils.debug("Force break after " + nbMove);
-						break;
-					}
+					nbMove++;
 				}
 				game.simulate(move);
 				double value = minimax(depth - 1, alpha, beta, false);
@@ -475,6 +475,13 @@ class Logic {
 					break;
 				}
 				alpha = Math.max(alpha, bestValue);
+				if (depth > MAX_DEPTH-2) {
+					end = System.nanoTime();
+					if ((end - start) > 42000000) {
+						Utils.debug("Force break after " + nbMove);
+						break;
+					}
+				}
 			}
 		}
 
@@ -596,6 +603,7 @@ class Cell implements Comparable<Cell> {
 }
 
 class PriorityWrapper implements Comparable<PriorityWrapper>{
+	
 	Cell targetCell;
 	Pawn pawn;
 	Direction moveTo;
@@ -606,6 +614,22 @@ class PriorityWrapper implements Comparable<PriorityWrapper>{
 		this.pawn = pawn;
 		this.moveTo = moveTo;
 		this.height = height;
+	}
+	
+	public Cell getTargetCell() {
+		return targetCell;
+	}
+
+	public Pawn getPawn() {
+		return pawn;
+	}
+
+	public Direction getMoveTo() {
+		return moveTo;
+	}
+
+	public int getHeight() {
+		return height;
 	}
 	
 	@Override
@@ -677,6 +701,10 @@ class Pawn {
 	}
 	
 	public void inactive() {
+		this.isActive = false;
+	}
+	
+	public void active() {
 		this.isActive = true;
 	}
 	
