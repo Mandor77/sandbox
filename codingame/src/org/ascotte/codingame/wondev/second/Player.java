@@ -136,11 +136,11 @@ class Game {
 				Direction moveDirection = Direction.get(i);
 				Cell targetCell = this.grid.getNeighbourg(currentCell, moveDirection);
 				// Move is not possible
-				if (targetCell == null || !targetCell.isReachable(currentCell.height)) {
+				if (targetCell == null || !targetCell.isReachable()) {
 					//Utils.debug("Move not possible " + moveDirection + " " + currentCell.width + " " + currentCell.length);
 					continue;
 				}
-				isMovable = targetCell.isMovable();
+				isMovable = targetCell.isMovable(currentCell.height);
 				isPushable = targetCell.isPushable(pawn);
 				if (!isMovable && !isPushable) { continue; }
 				
@@ -163,7 +163,7 @@ class Game {
 					if (isPushable) {
 						if ((buildDirection.id >= (8 + moveDirection.id - 1)%8 ) &&
 								buildDirection.id <= (8 + moveDirection.id + 1)%8) {
-							if (buildCell.isReachable(targetCell.height)) {
+							if (buildCell.isReachable() && buildCell.isMovable(targetCell.height)) {
 								legalMoves.add(getMove(playerId, pawnId, Command.PUSH_AND_BUILD, moveDirection, buildDirection));
 								nbLegalActionForPawn++;
 							}
@@ -195,10 +195,6 @@ class Game {
 	
 	public void setPawnLocation(int playerId, int pawnId, int x, int y) {
 		
-		// In case of the pawn is not visible
-		if (x == -1 || y == -1) { return; }
-		
-		Cell newLocation = this.grid.getCell(x, y);
 		Human human = this.humans[playerId];
 		Pawn pawn = human.getPawn(pawnId);
 		Cell currentLocation = pawn.getLocation();
@@ -208,6 +204,13 @@ class Game {
 			currentLocation.removePawn();
 		}
 		
+		// In case of the pawn is not visible
+		if (x == -1 || y == -1) {
+			pawn.setLocation(null);
+			return; 
+		}
+		
+		Cell newLocation = this.grid.getCell(x, y);
 		// Put pawn to its new location
 		newLocation.addPawn(pawn);
 		pawn.setLocation(newLocation);
@@ -252,7 +255,7 @@ class Game {
 	public void markScore(int playerId, int pawnId, int score) {
 		Human human = this.humans[playerId];
 		Pawn pawn = human.getPawn(pawnId);
-		if (pawn.getLocation().height == 3) {
+		if (pawn.getLocation() != null && pawn.getLocation().height == 3) {
 			human.addToScore(score);
 		}
 	}
@@ -293,11 +296,83 @@ class Game {
 		}
 	}
 
-	public double eval() {
-		Human human = this.humans[Player.PLAYER];
+	public double evalOld(boolean noMoreLegalMove) {
+		Human player = this.humans[Player.PLAYER];
+		Human opponent = this.humans[Player.OPPONENT];
 		double fitness = 0;
-		for (int i = 0; i < human.nbPawns; i++) {
-			fitness += human.getPawn(i).getLocation().height;
+		for (int i = 0; i < player.nbPawns; i++) {
+			fitness += player.getPawn(i).getLocation().height;
+		}
+		fitness += (player.getScore() * 5) - (opponent.getScore() * 5);
+		if (noMoreLegalMove) {
+			fitness -= 100;
+		}
+		return fitness;
+	}
+	
+	public double eval(boolean noMoreLegalMove) {
+		Human player = this.humans[Player.PLAYER];
+		Human opponent = this.humans[Player.OPPONENT];
+		
+		double totalMyHeight = 0;
+		double meanMyHeight = 0;
+		int myFactor = 0;
+		
+		for (int i = 0; i < player.nbPawns; i++) {
+			Pawn pawn = player.getPawn(i);
+			if (!pawn.isActive()) { continue; }
+			Cell currentCell = pawn.getLocation();
+			if (currentCell != null) {
+				totalMyHeight += (pawn.getLocation().height * 4);
+				myFactor += 4;
+				for (int j = 0; j < Game.DIRECTION_NUMBER; j++) {
+					Cell targetCell = this.grid.getNeighbourg(currentCell, Direction.get(j));
+					if (targetCell != null && targetCell.isReachable() && targetCell.isMovable(pawn.getLocation().height)) {
+						totalMyHeight += targetCell.height;
+						myFactor++;
+					}
+				}
+			}
+		}
+		
+		if (myFactor != 0) {
+			meanMyHeight = totalMyHeight / myFactor;
+		}
+		
+		
+		double totalOpponentHeight = 0;
+		double meanOpponentHeight = 0;
+		int opponentFactor = 0;
+		
+		for (int i = 0; i < opponent.nbPawns; i++) {
+			Pawn pawn = opponent.getPawn(i);
+			if (!pawn.isActive()) { continue; }
+			Cell currentCell = pawn.getLocation();
+			if (currentCell != null) {
+				totalOpponentHeight += (pawn.getLocation().height * 4);
+				opponentFactor += 4;
+				for (int j = 0; j < Game.DIRECTION_NUMBER; j++) {
+					Cell targetCell = this.grid.getNeighbourg(currentCell, Direction.get(j));
+					if (targetCell != null && targetCell.isReachable() && targetCell.isMovable(pawn.getLocation().height)) {
+						totalOpponentHeight += targetCell.height;
+						opponentFactor++;
+					}
+				}
+			}
+		}
+		
+		if (opponentFactor != 0) {
+			meanOpponentHeight = totalOpponentHeight / opponentFactor;
+		}
+		
+		
+		double fitness = (meanMyHeight - (meanOpponentHeight/2))*1.33;
+		
+		int deltaScore = player.getScore() - opponent.getScore();
+		fitness += deltaScore;
+		
+		if (noMoreLegalMove) {
+			fitness -= 10;
 		}
 		return fitness;
 	}
@@ -347,8 +422,10 @@ class Logic {
 	
 	public double minimax(int depth, double alpha, double beta, boolean maximizingPlayer) {
 
+		List<Move> legalMoves = null;
+		
 		if (depth == 0) {
-			return game.eval();
+			return game.eval(false);
 		}
 
 		double bestValue = 0d;
@@ -361,7 +438,9 @@ class Logic {
 		// min
 		if (!maximizingPlayer) {
 			bestValue = Double.POSITIVE_INFINITY;
-			for (Move move : game.getLegalMoves(Player.OPPONENT)) {
+			legalMoves = game.getLegalMoves(Player.OPPONENT);
+			if (legalMoves.isEmpty()) {return game.eval(true);}
+			for (Move move : legalMoves) {
 				game.simulate(move);
 				double value = minimax(depth - 1, alpha, beta, true);
 				if (value < bestValue) {
@@ -380,11 +459,13 @@ class Logic {
 		else {
 			bestValue = Double.NEGATIVE_INFINITY;
 			int nbMove = 0;
-			for (Move move : game.getLegalMoves(Player.PLAYER)) {
+			legalMoves = game.getLegalMoves(Player.PLAYER);
+			if (legalMoves.isEmpty()) {return game.eval(true);}
+			for (Move move : legalMoves) {
 				nbMove++;
 				if (depth == MAX_DEPTH) {
 					end = System.nanoTime();
-					if ((end - start) > 40000000) {
+					if ((end - start) > 45000000) {
 						Utils.debug("Force break after " + nbMove);
 						break;
 					}
@@ -471,9 +552,8 @@ class Cell {
 		this.pawn = null;
 	}
 	
-	public boolean isReachable(int fromHeight) {
+	public boolean isReachable() {
 		if (height == -1 || height == 4) {return false;}
-		if (height - fromHeight > 1) {return false;}
 		return true;
 	}
 	
@@ -483,8 +563,9 @@ class Cell {
 		return true;
 	}
 	
-	public boolean isMovable() {
+	public boolean isMovable(int fromHeight) {
 		if (pawn != null) { return false; }
+		if (height - fromHeight > 1) {return false;}
 		return true;
 	}
 	
