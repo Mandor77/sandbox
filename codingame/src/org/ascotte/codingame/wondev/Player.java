@@ -38,8 +38,8 @@ class Player {
 	final static Game game = new Game();
 	final static int PLAYER = 0;
 	final static int OPPONENT = 1;
-	final static int MAX_SIMULATIONS = 5000;
-	final static int SIMULATION_LENGTH = 1;
+	final static int MAX_SIMULATIONS = 2000;
+	final static int SIMULATION_LENGTH = 3;
 	final static int MAX_TURN = 400;
 	static int NUM_TURN = 0;
 	static Statistics[][][] statistics = new Statistics[MAX_TURN][SIMULATION_LENGTH + 1][Game.LEGAL_ACTIONS.length];
@@ -113,17 +113,18 @@ class Player {
 			Utils.debug("Nombre actions " + legalActionList.size() + " / " + legalActions);
 	
 			simulate(legalActionList);
+			Utils.debug("End of simulation");
 			chooseBest();
 			
 			long end = System.currentTimeMillis();
 			Utils.debug("Duration = " + (end - debut));
 			
-			for (LegalAction legalAction:legalActionList) {
+			/*for (LegalAction legalAction:legalActionList) {
 				Utils.debug("Average " + legalAction.pawnId + " " + legalAction.moveTo + " " + 
 			      legalAction.buildTo + " = " + statistics[NUM_TURN][0][legalAction.getId()].getNumberFitness() 
 			      + "/" + statistics[NUM_TURN][0][legalAction.getId()].getFitness() 
 			      + "/" + statistics[NUM_TURN][0][legalAction.getId()].getAverageFitness());
-			}
+			}*/
 			
 			NUM_TURN++;
 		}
@@ -132,13 +133,17 @@ class Player {
 	public static void simulate(List<LegalAction> initialLegalActionList) {
 		Stack<LegalAction> rollbacks = new Stack<>();
 		LegalAction rollbackAction;
+		long start = System.currentTimeMillis();
 		
 		// Choose and play a random action
 		for (int i = 0; i < MAX_SIMULATIONS; i++) {
-		    String key = "" + NUM_TURN + "-";
+			long end = System.currentTimeMillis();
+			if ((i % 250) == 0) { Utils.debug("Step = " + i + " / " + (end - start)); }
+			
 			LegalAction initialLegalAction;
 			initialLegalAction = IA.playRandomIA(initialLegalActionList);
-			key = key + initialLegalAction.id;
+			String key = "" + NUM_TURN + "-";
+			key = key + initialLegalAction.id + "-";
 			
 			rollbackAction = simulateLegalAction(initialLegalAction);
 			rollbacks.push(rollbackAction);
@@ -178,7 +183,7 @@ class Player {
 				List<LegalAction> legalActionList = game.getLegalActions(PLAYER, key);
 				LegalAction nextLegalAction = IA.playRandomIA(legalActionList);
 				if (nextLegalAction == null) { break; }
-				key = key + nextLegalAction.id;
+				key = key + nextLegalAction.id + "-";
 				LegalAction nextRollbackAction = simulateLegalAction(nextLegalAction);
 				rollbacks.push(nextRollbackAction);
 				statistics[NUM_TURN][0][initialLegalAction.getId()].setFitness(game.fitness(PLAYER));
@@ -208,6 +213,7 @@ class Player {
 			}
 		}
 		
+		Utils.debug("Publish !");
 		publishLegalAction(Game.LEGAL_ACTIONS[bestIndex]);
 	}
 	
@@ -656,19 +662,6 @@ class IA {
 		if (size == 0) { return null; }
 		int index = rand.nextInt(size);
 		LegalAction actionToPlay = legalActionList.get(index);
-		return actionToPlay;
-	}
-	
-	public static LegalAction playSelectiveIA(List<LegalAction> legalActionList) {
-		PriorityQueue<LegalAction> priority = new PriorityQueue<LegalAction>();
-		priority.addAll(legalActionList);
-		int index = rand.nextInt(5);
-		LegalAction actionToPlay = null;
-		
-		while(!priority.isEmpty() && index >= 0) {
-			actionToPlay = priority.remove();
-			index--;
-		}
 		return actionToPlay;
 	}
 }
