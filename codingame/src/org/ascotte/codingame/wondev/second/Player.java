@@ -297,7 +297,7 @@ class Game {
 class Logic {
 
 	Game game;
-	final static int MAX_DEPTH = 2;
+	final static int MAX_DEPTH = 3;
 	
 	public Logic(Game game) {
 		this.game = game;
@@ -329,11 +329,8 @@ class Logic {
 	}*/
 	
 	public void play(int legalMoveNumber) {
-		
-		int depth = MAX_DEPTH;
-		if (legalMoveNumber < 50) { depth++; }
-		
-		double value = minimax(depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, true);
+				
+		double value = minimax(MAX_DEPTH, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, true);
 	}
 	
 	public double minimax(int depth, double alpha, double beta, boolean maximizingPlayer) {
@@ -344,6 +341,10 @@ class Logic {
 
 		double bestValue = 0d;
 		Move bestMove = null;
+		long start = 0, end = 0;
+		if (depth == MAX_DEPTH) {
+			start = System.nanoTime();
+		}
 		
 		// min
 		if (!maximizingPlayer) {
@@ -366,7 +367,16 @@ class Logic {
 		// max
 		else {
 			bestValue = Double.NEGATIVE_INFINITY;
+			int nbMove = 0;
 			for (Move move : game.getLegalMoves(Player.PLAYER)) {
+				nbMove++;
+				if (depth == MAX_DEPTH) {
+					end = System.nanoTime();
+					if ((end - start) > 40000000) {
+						Utils.debug("Force break after " + nbMove);
+						break;
+					}
+				}
 				game.simulate(move);
 				double value = minimax(depth - 1, alpha, beta, true);
 				if (value > bestValue) {
