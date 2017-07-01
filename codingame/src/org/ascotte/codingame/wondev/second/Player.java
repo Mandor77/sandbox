@@ -84,6 +84,7 @@ class Player {
 				int index = in.nextInt();
 				String dir1 = in.next();
 				String dir2 = in.next();
+				//Utils.debug("Proposed action = " + atype + " " + index + " " + dir1 + " " + dir2);
 			}
 			
 			long start = System.nanoTime();
@@ -92,6 +93,9 @@ class Player {
 			Utils.debug("Nombre actions " + legalMoves.size() + " / " + legalMoveNumber);
 			long intermediary = System.nanoTime();
 			Utils.debug("Duration = " + (intermediary - start));
+			/*for (Move move:legalMoves) {
+				Utils.debug("Action = " + move.toString());
+			}*/
 			
 			logic.play(legalMoveNumber);
 			
@@ -110,13 +114,15 @@ class Game {
 	final static int PLAYER_NUMBER = 2;
 	final static int PAWN_NUMBER = 2;
 	final static int DIRECTION_NUMBER = 8;
-	final static int COMMAND_NUMBER = 1;
+	final static int COMMAND_NUMBER = 2;
 	static Move[] MOVES = new Move[PLAYER_NUMBER * PAWN_NUMBER * COMMAND_NUMBER * DIRECTION_NUMBER * DIRECTION_NUMBER];
 	
 	public List<Move> getLegalMoves(int playerId) {
 		
 		List<Move> legalMoves = new ArrayList<Move>();
 		Pawn[] pawns = this.humans[playerId].getPawns();
+		boolean isMovable = false;
+		boolean isPushable = false;
 	
 		// For each pawn
 		for (int pawnId = 0; pawnId < pawns.length; pawnId++) {
@@ -134,8 +140,11 @@ class Game {
 					//Utils.debug("Move not possible " + moveDirection + " " + currentCell.width + " " + currentCell.length);
 					continue;
 				}
-			
-				// Move is possible
+				isMovable = targetCell.isMovable();
+				isPushable = targetCell.isPushable(pawn);
+				if (!isMovable && !isPushable) { continue; }
+				
+				// Move or push is possible
 				for (int j = 0; j < DIRECTION_NUMBER; j++) {
 					Direction buildDirection = Direction.get(j);
 					Cell buildCell = this.grid.getNeighbourg(targetCell, buildDirection);
@@ -143,11 +152,23 @@ class Game {
 					if (buildCell == null || !buildCell.isBuildable(pawn)) {
 						//Utils.debug("Build not possible " + buildDirection + " " + targetCell.width + " " + targetCell.length);
 						continue;
-						}
+					}
 					
-					// Build is possible
-					legalMoves.add(getMove(playerId, pawnId, Command.MOVE_AND_BUILD, moveDirection, buildDirection));
-					nbLegalActionForPawn++;
+					// If move and build is possible
+					if (isMovable) {
+						legalMoves.add(getMove(playerId, pawnId, Command.MOVE_AND_BUILD, moveDirection, buildDirection));
+						nbLegalActionForPawn++;
+					}
+					
+					if (isPushable) {
+						if ((buildDirection.id >= (8 + moveDirection.id - 1)%8 ) &&
+								buildDirection.id <= (8 + moveDirection.id + 1)%8) {
+							if (buildCell.isReachable(targetCell.height)) {
+								legalMoves.add(getMove(playerId, pawnId, Command.PUSH_AND_BUILD, moveDirection, buildDirection));
+								nbLegalActionForPawn++;
+							}
+						}
+					}
 				}
 			}
 			
@@ -163,7 +184,7 @@ class Game {
 	public void initGame(int gridSize, int nbPawnsByHuman) {
 		this.grid.createGrid(gridSize);
 		for (int i = 0; i < humans.length; i++) {
-			this.humans[i] = new Human(nbPawnsByHuman);
+			this.humans[i] = new Human(i, nbPawnsByHuman);
 		}
 		this.createMoves();
 	}
@@ -198,23 +219,31 @@ class Game {
 		int pawnId = move.getPawnId();
 		Pawn pawn = this.humans[playerId].getPawn(pawnId);
 		Cell currentCell = pawn.getLocation();
-		Cell targetCell = null;
-		Cell buildCell = null;
+		Cell firstCell = null;
+		Cell secondCell = null;
 		Direction moveDirection = move.getMoveTo();
 		Direction buildDirection = move.getBuildTo();
 		
 		switch(move.getCommand()) {
 		case MOVE_AND_BUILD:
-			targetCell = this.grid.getNeighbourg(currentCell, moveDirection);
-			this.setPawnLocation(playerId, pawnId, targetCell.x, targetCell.y);
+			firstCell = this.grid.getNeighbourg(currentCell, moveDirection);
+			this.setPawnLocation(playerId, pawnId, firstCell.x, firstCell.y);
 			this.markScore(playerId, pawnId, 1);
-			buildCell = this.grid.getNeighbourg(targetCell, buildDirection);
-			if (buildCell == null) {
+			secondCell = this.grid.getNeighbourg(firstCell, buildDirection);
+			if (secondCell == null) {
 				Utils.debug(move.toString() + " " + currentCell.x + "/" + currentCell.y);
-				Utils.debug(move.toString() + " " + targetCell.x + "/" + targetCell.y);
+				Utils.debug(move.toString() + " " + firstCell.x + "/" + firstCell.y);
 			}
-			buildCell.upHeight();
+			secondCell.upHeight();
 			break;
+		case PUSH_AND_BUILD:
+			firstCell = this.grid.getNeighbourg(currentCell, moveDirection);
+			secondCell = this.grid.getNeighbourg(firstCell, buildDirection);
+			Pawn opponentPawn = firstCell.getPawn();
+			if (opponentPawn != null) {
+				this.setPawnLocation(opponentPawn.getPlayerId(), opponentPawn.getId(), secondCell.x, secondCell.y);
+			}
+			firstCell.upHeight();	
 		default:
 			break;
 		}
@@ -237,22 +266,30 @@ class Game {
 		int pawnId = move.getPawnId();
 		Pawn pawn = this.humans[playerId].getPawn(pawnId);
 		Cell currentCell = pawn.getLocation();
-		Cell targetCell = null;
-		Cell buildCell = null;
-		Direction moveDirection = move.getMoveTo().getReverse();
+		Cell firstCell = null;
+		Cell secondCell = null;
+		Direction moveDirection = move.getMoveTo();
 		Direction buildDirection = move.getBuildTo();
 		
 		switch(move.getCommand()) {
 		case MOVE_AND_BUILD:
-			buildCell = this.grid.getNeighbourg(currentCell, buildDirection);
-			buildCell.downHeight();
+			moveDirection = move.getMoveTo().getReverse();
+			secondCell = this.grid.getNeighbourg(currentCell, buildDirection);
+			secondCell.downHeight();
 			this.markScore(playerId, pawnId, -1);
-			targetCell = this.grid.getNeighbourg(currentCell, moveDirection);
-			this.setPawnLocation(playerId, pawnId, targetCell.x, targetCell.y);
+			firstCell = this.grid.getNeighbourg(currentCell, moveDirection);
+			this.setPawnLocation(playerId, pawnId, firstCell.x, firstCell.y);
 			break;
+		case PUSH_AND_BUILD:
+			firstCell = this.grid.getNeighbourg(currentCell, moveDirection);
+			secondCell = this.grid.getNeighbourg(firstCell, buildDirection);
+			Pawn opponentPawn = secondCell.getPawn();
+			if (opponentPawn != null) {
+				this.setPawnLocation(opponentPawn.getPlayerId(), opponentPawn.getId(), firstCell.x, firstCell.y);
+			}
+			firstCell.downHeight();
 		default:
 			break;
-	
 		}
 	}
 
@@ -302,31 +339,6 @@ class Logic {
 	public Logic(Game game) {
 		this.game = game;
 	}
-	
-	//Level B
-	/*public void play() {
-		
-		double bestValue = Double.NEGATIVE_INFINITY;
-		Move bestMove = null;
-		long start = System.currentTimeMillis();
-		
-		for (Move move:game.getLegalMoves(Player.PLAYER)) {
-			
-			game.simulate(move);
-			double value = minimax(MAX_DEPTH, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, false);
-			
-			if (value > bestValue) {
-				bestValue = value;
-				bestMove = move;
-			}
-			
-			game.rollback(move);
-			long end = System.currentTimeMillis();
-			Utils.debug("One game = " + (end - start));
-		}
-		
-		game.play(bestMove);
-	}*/
 	
 	public void play(int legalMoveNumber) {
 				
@@ -451,14 +463,28 @@ class Cell {
 		this.pawn = pawn;
 	}
 	
+	public Pawn getPawn() {
+		return this.pawn;
+	}
+	
 	public void removePawn() {
 		this.pawn = null;
 	}
 	
 	public boolean isReachable(int fromHeight) {
-		if (pawn != null) {return false;}
 		if (height == -1 || height == 4) {return false;}
 		if (height - fromHeight > 1) {return false;}
+		return true;
+	}
+	
+	public boolean isPushable(Pawn fromPawn) {
+		if (pawn == null) { return false; }
+		if (pawn.getPlayerId() == fromPawn.getPlayerId()) { return false; }
+		return true;
+	}
+	
+	public boolean isMovable() {
+		if (pawn != null) { return false; }
 		return true;
 	}
 	
@@ -481,12 +507,14 @@ class Human {
 	Pawn[] pawn = null;
 	int nbPawns = 0;
 	int score = 0;
+	int playerId;
 	
-	public Human(int nbPawns) {
+	public Human(int playerId, int nbPawns) {
 		this.pawn = new Pawn[nbPawns];
 		this.nbPawns = nbPawns;
+		this.playerId = playerId;
 		for (int i = 0; i < nbPawns; i++) {
-			this.pawn[i] = new Pawn();
+			this.pawn[i] = new Pawn(playerId, i);
 		}
 	}
 	
@@ -508,8 +536,23 @@ class Human {
 }
 
 class Pawn {
+	int id;
+	int playerId;
 	Cell location = null;
 	boolean isActive = true;
+	
+	public Pawn(int playerId, int id) {
+		this.playerId = playerId;
+		this.id = id;
+	}
+	
+	public int getId() {
+		return this.id;
+	}
+	
+	public int getPlayerId() {
+		return this.playerId;
+	}
 	
 	public void setLocation(Cell location) {
 		this.location = location;
@@ -583,14 +626,18 @@ enum Command {
 	public static Command get(int index) {
 		switch(index) {
 		case 0: return Command.MOVE_AND_BUILD;
+		case 1: return Command.PUSH_AND_BUILD;
 		}
+		
 		return null;
 	}
 	
 	public int toInteger() {
 		switch(this) {
 		case MOVE_AND_BUILD: return 0;
+		case PUSH_AND_BUILD: return 1;
 		}
+		
 		return -1;
 	}
 }
