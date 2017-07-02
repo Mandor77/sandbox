@@ -85,7 +85,7 @@ class Player {
 				int index = in.nextInt();
 				String dir1 = in.next();
 				String dir2 = in.next();
-				Utils.debug("Proposed action = " + atype + " " + index + " " + dir1 + " " + dir2);
+				//Utils.debug("Proposed action = " + atype + " " + index + " " + dir1 + " " + dir2);
 			}
 			
 			long start = System.nanoTime();
@@ -94,9 +94,9 @@ class Player {
 			Utils.debug("Nombre actions " + legalMoves.size() + " / " + legalMoveNumber);
 			long intermediary = System.nanoTime();
 			Utils.debug("Duration = " + (intermediary - start));
-			for (Move move:legalMoves) {
-				Utils.debug("Action = " + move.toString());
-			}
+			//for (Move move:legalMoves) {
+			//	Utils.debug("Action = " + move.toString());
+			//}
 			
 			logic.play(legalMoveNumber);
 			
@@ -229,6 +229,7 @@ class Game {
 		// In case of the pawn is not visible
 		if (x == -1 || y == -1) {
 			pawn.setLocation(null);
+			Utils.debug("Opponent pawn is not visible = " + pawnId);
 			return; 
 		}
 		
@@ -259,7 +260,9 @@ class Game {
 				Utils.debug(move.toString() + " " + currentCell.x + "/" + currentCell.y);
 				Utils.debug(move.toString() + " " + firstCell.x + "/" + firstCell.y);
 			}
-			secondCell.upHeight();
+			if (secondCell.getPawn() != null) {
+				secondCell.upHeight();
+			}
 			break;
 		case PUSH_AND_BUILD:
 			firstCell = this.grid.getNeighbourg(currentCell, moveDirection);
@@ -268,7 +271,9 @@ class Game {
 			if (opponentPawn != null) {
 				this.setPawnLocation(opponentPawn.getPlayerId(), opponentPawn.getId(), secondCell.x, secondCell.y);
 			}
-			firstCell.upHeight();	
+			if (firstCell.getPawn() != null) {
+				firstCell.upHeight();
+			}
 		default:
 			break;
 		}
@@ -300,7 +305,9 @@ class Game {
 		case MOVE_AND_BUILD:
 			moveDirection = move.getMoveTo().getReverse();
 			secondCell = this.grid.getNeighbourg(currentCell, buildDirection);
-			secondCell.downHeight();
+			if (secondCell.getPawn() != null) {
+				secondCell.downHeight();
+			}
 			this.markScore(playerId, pawnId, -1);
 			firstCell = this.grid.getNeighbourg(currentCell, moveDirection);
 			this.setPawnLocation(playerId, pawnId, firstCell.x, firstCell.y);
@@ -312,7 +319,9 @@ class Game {
 			if (opponentPawn != null) {
 				this.setPawnLocation(opponentPawn.getPlayerId(), opponentPawn.getId(), firstCell.x, firstCell.y);
 			}
-			firstCell.downHeight();
+			if (firstCell.getPawn() != null) {
+				firstCell.downHeight();
+			}
 		default:
 			break;
 		}
@@ -323,40 +332,9 @@ class Game {
 		Human opponent = this.humans[Player.OPPONENT];
 		
 		int fitness = 0;
-		
-		for (int i = 0; i < player.nbPawns; i++) {
-			Pawn pawn = player.getPawn(i);
-			if (!pawn.isActive()) { continue; }
-			Cell currentCell = pawn.getLocation();
-			if (currentCell != null) {
-				fitness += (pawn.getLocation().height * 4);
-				for (int j = 0; j < Game.DIRECTION_NUMBER; j++) {
-					Cell targetCell = this.grid.getNeighbourg(currentCell, Direction.get(j));
-					if (targetCell != null && targetCell.isReachable() && targetCell.isMovable(pawn.getLocation().height)) {
-						fitness += targetCell.height;
-					}
-				}
-			}
-		}
 
-		for (int i = 0; i < opponent.nbPawns; i++) {
-			Pawn pawn = opponent.getPawn(i);
-			if (!pawn.isActive()) { continue; }
-			Cell currentCell = pawn.getLocation();
-			if (currentCell != null) {
-				fitness -= (pawn.getLocation().height * 4);
-				for (int j = 0; j < Game.DIRECTION_NUMBER; j++) {
-					Cell targetCell = this.grid.getNeighbourg(currentCell, Direction.get(j));
-					if (targetCell != null && targetCell.isReachable() && targetCell.isMovable(pawn.getLocation().height)) {
-						fitness -= targetCell.height;
-					}
-				}
-			}
-		}
+		fitness = player.pawn[0].getLocation().height;
 		
-		if (noMoreLegalMove) {
-			fitness -= 100;
-		}
 		return fitness;
 	}
 	
@@ -396,6 +374,7 @@ class Logic {
 	static int NB_TRY = 0;
 	static int NB_ALPHA = 0;
 	static int NB_BETA = 0;
+	static long start = 0;
 	
 	public Logic(Game game) {
 		this.game = game;
@@ -403,7 +382,6 @@ class Logic {
 	
 	public void play(int legalMoveNumber) {
 		
-		MAX_DEPTH = 4;
 		double value = minimax(MAX_DEPTH, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, true);
 		Utils.debug("TRY=" + NB_TRY + " ALPHA=" + NB_ALPHA + " BETA=" + NB_BETA);
 	}
@@ -414,14 +392,15 @@ class Logic {
 		
 		if (depth == 0) {
 			NB_TRY++;
-			return game.eval(false);
+			double eval = game.eval(false);
+			return eval;
 		}
 
 		int nbMove = 0;
 		double bestValue = 0d;
 		Move bestMove = null;
-		long start = 0, end = 0;
-		if (depth > MAX_DEPTH-2) {
+		long end = 0;
+		if (depth == MAX_DEPTH) {
 			start = System.nanoTime();
 		}
 		
@@ -429,7 +408,7 @@ class Logic {
 		if (!maximizingPlayer) {
 			bestValue = Double.POSITIVE_INFINITY;
 			legalMoves = game.getLegalMoves(Player.OPPONENT, false);
-			if (legalMoves.isEmpty()) {return game.eval(true);}
+			if (legalMoves.isEmpty()) { bestValue = minimax(depth - 1, alpha, beta, true);}
 			for (Move move : legalMoves) {
 				game.simulate(move);
 				double value = minimax(depth - 1, alpha, beta, true);
@@ -437,16 +416,20 @@ class Logic {
 					bestValue = value;
 					bestMove = move;
 				}
+				
 				game.rollback(move);
 				if (alpha > bestValue) {
 					NB_ALPHA++;
 					break;
 				}
+				
 				beta = Math.min(beta, bestValue);
 				if (depth > MAX_DEPTH-2) {
 					end = System.nanoTime();
-					if ((end - start) > 42000000) {
-						Utils.debug("Force break after " + nbMove);
+					if ((end - start) > 44000000) {
+						if (depth == MAX_DEPTH) {
+							Utils.debug("Force break after " + nbMove);
+						}
 						break;
 					}
 				}
@@ -459,7 +442,6 @@ class Logic {
 			legalMoves = game.getLegalMoves(Player.PLAYER, false);
 			if (legalMoves.isEmpty()) {return game.eval(true);}
 			for (Move move : legalMoves) {
-				
 				if (depth == MAX_DEPTH) {
 					nbMove++;
 				}
@@ -470,6 +452,9 @@ class Logic {
 					bestMove = move;
 				}
 				game.rollback(move);
+				if (depth == MAX_DEPTH) {
+					Utils.debug("Val="+value+" "+move.toString());
+				}
 				if (beta < bestValue) {
 					NB_BETA++;
 					break;
@@ -477,8 +462,10 @@ class Logic {
 				alpha = Math.max(alpha, bestValue);
 				if (depth > MAX_DEPTH-2) {
 					end = System.nanoTime();
-					if ((end - start) > 42000000) {
-						Utils.debug("Force break after " + nbMove);
+					if ((end - start) > 44000000) {
+						if (depth == MAX_DEPTH) {
+							Utils.debug("Force break after " + nbMove);
+						}
 						break;
 					}
 				}
