@@ -260,7 +260,7 @@ class Game {
 				Utils.debug(move.toString() + " " + currentCell.x + "/" + currentCell.y);
 				Utils.debug(move.toString() + " " + firstCell.x + "/" + firstCell.y);
 			}
-			if (secondCell.getPawn() != null) {
+			if (secondCell.getPawn() == null) {
 				secondCell.upHeight();
 			}
 			break;
@@ -271,7 +271,7 @@ class Game {
 			if (opponentPawn != null) {
 				this.setPawnLocation(opponentPawn.getPlayerId(), opponentPawn.getId(), secondCell.x, secondCell.y);
 			}
-			if (firstCell.getPawn() != null) {
+			if (firstCell.getPawn() == null) {
 				firstCell.upHeight();
 			}
 		default:
@@ -305,7 +305,7 @@ class Game {
 		case MOVE_AND_BUILD:
 			moveDirection = move.getMoveTo().getReverse();
 			secondCell = this.grid.getNeighbourg(currentCell, buildDirection);
-			if (secondCell.getPawn() != null) {
+			if (secondCell.getPawn() == null) {
 				secondCell.downHeight();
 			}
 			this.markScore(playerId, pawnId, -1);
@@ -319,7 +319,7 @@ class Game {
 			if (opponentPawn != null) {
 				this.setPawnLocation(opponentPawn.getPlayerId(), opponentPawn.getId(), firstCell.x, firstCell.y);
 			}
-			if (firstCell.getPawn() != null) {
+			if (firstCell.getPawn() == null) {
 				firstCell.downHeight();
 			}
 		default:
@@ -332,9 +332,54 @@ class Game {
 		Human opponent = this.humans[Player.OPPONENT];
 		
 		int fitness = 0;
-
-		fitness = player.pawn[0].getLocation().height;
 		
+		fitness = player.getPawn(0).getLocation().height;
+		
+		if (noMoreLegalMove) {
+			fitness -= 100;
+		}
+		return fitness;
+	}
+	
+	public double evalOld(boolean noMoreLegalMove) {
+		Human player = this.humans[Player.PLAYER];
+		Human opponent = this.humans[Player.OPPONENT];
+		
+		int fitness = 0;
+		
+		for (int i = 0; i < player.nbPawns; i++) {
+			Pawn pawn = player.getPawn(i);
+			if (!pawn.isActive()) { continue; }
+			Cell currentCell = pawn.getLocation();
+			if (currentCell != null) {
+				fitness += (pawn.getLocation().height * 4);
+				for (int j = 0; j < Game.DIRECTION_NUMBER; j++) {
+					Cell targetCell = this.grid.getNeighbourg(currentCell, Direction.get(j));
+					if (targetCell != null && targetCell.isReachable() && targetCell.isMovable(pawn.getLocation().height)) {
+						fitness += targetCell.height;
+					}
+				}
+			}
+		}
+
+		for (int i = 0; i < opponent.nbPawns; i++) {
+			Pawn pawn = opponent.getPawn(i);
+			if (!pawn.isActive()) { continue; }
+			Cell currentCell = pawn.getLocation();
+			if (currentCell != null) {
+				fitness -= (pawn.getLocation().height * 4);
+				for (int j = 0; j < Game.DIRECTION_NUMBER; j++) {
+					Cell targetCell = this.grid.getNeighbourg(currentCell, Direction.get(j));
+					if (targetCell != null && targetCell.isReachable() && targetCell.isMovable(pawn.getLocation().height)) {
+						fitness -= targetCell.height;
+					}
+				}
+			}
+		}
+		
+		if (noMoreLegalMove) {
+			fitness -= 100;
+		}
 		return fitness;
 	}
 	
@@ -370,7 +415,7 @@ class Game {
 class Logic {
 
 	Game game;
-	static int MAX_DEPTH = 3; 
+	static int MAX_DEPTH = 4; 
 	static int NB_TRY = 0;
 	static int NB_ALPHA = 0;
 	static int NB_BETA = 0;
