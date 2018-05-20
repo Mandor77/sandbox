@@ -9,7 +9,9 @@ import java.util.Optional;
 import java.util.Scanner;
 import java.util.StringJoiner;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -163,7 +165,8 @@ class Player {
                 		Game.friendlyKnight.add(new Knight(Role.FRIENDLY, x, y, health));
                 	}
                 	else if (owner == Game.ENEMY) {
-                		Game.enemyKnight.add(new Knight(Role.ENEMY, x, y, health));
+                		int trancheId = new Integer((x / (Game.maxWide / Game.nbTranches)) + 1);
+                		Game.enemyKnight.add(new Knight(Role.ENEMY, x, y, health, trancheId));
                 	}
                 }
                 else if (unitType == Game.ARCHER) {
@@ -201,6 +204,11 @@ class Player {
     			}
     		}
             
+            if (Queen.originX > (Game.maxWide / 2)) { 
+            	for (Knight knight:Game.enemyKnight) {
+            		knight.inverseTranche();
+            	}
+            }
             Game.play();
         }
     }
@@ -235,6 +243,8 @@ class Game {
 	final static int towerInDangerAggressive = 300;
 	final static int towerNotMaxedAggressive = 500;
 	
+	final static int safeDistance = 500;
+	
 	static Queen friendlyQueen;
 	static Queen enemyQueen;
 	
@@ -260,173 +270,27 @@ class Game {
 	
 	static void playAggressiveStep1() {
 	    
-	    Site site = null;
-				
-		// Evolve all mines
-		site = Algorithm.getClosestSite(friendlyQueen, 
-				Algorithm.isMine()
-				.and(Algorithm.isOwned(friendlyQueen))
-				.and(Algorithm.isTouched(friendlyQueen))
-				.and(Algorithm.isMineNotMaxed()));
-		if (site != null) {
-			friendlyQueen.build(site.siteId, Structure.MINE);
-			return;
-		}
-		
-		// Evolve all towers
-		site = Algorithm.getClosestSite(friendlyQueen, 
-				Algorithm.isTowerNotMaxed(Game.towerNotMaxedAggressive)
-				.and(Algorithm.isTouched(friendlyQueen))
-				.and(Algorithm.isOwned(friendlyQueen)));
-		if (site != null) {
-			friendlyQueen.build(site.siteId, Structure.TOWER);
-			return;
-		}
-		
-		// First build two mines
-		if (Site.nbOfFriendlyMines < 2) {
-			site = Algorithm.getClosestSite(friendlyQueen, 
-					Algorithm.isEmpty());
-			if (site != null) {
-				friendlyQueen.build(site.siteId, Structure.MINE);
-				return;
-			}
-		}
-		
-		// Then build a barrack
-		if (Site.nbOfFriendlyKnightBarracks < 1) {
-			site = Algorithm.getClosestSite(friendlyQueen, 
-					Algorithm.isEmpty().
-					and((Algorithm.inTranche(2)).or(Algorithm.inTranche(3))));
-			if (site != null) {
-				friendlyQueen.build(site.siteId, Structure.BARRACKS_KNIGHT);
-				return;
-			}
-		}
-		
-		// Then restore tower
-		site = Algorithm.getClosestSite(friendlyQueen, 
-				Algorithm.isTowerInDanger(Game.towerInDangerAggressive)
-				.and(Algorithm.isOwned(friendlyQueen))
-				.and(Algorithm.withMaxTranche(2)));
-		if (site != null) {
-			friendlyQueen.build(site.siteId, Structure.TOWER);
-			return;
-		}
-		
-		// Then continue to mine
-		if (Site.nbOfFriendlyMines < 3) {
-			site = Algorithm.getClosestSite(friendlyQueen, 
-					Algorithm.isEmpty()
-					.and(Algorithm.withMaxTranche(2)));
-			if (site != null) {
-				friendlyQueen.build(site.siteId, Structure.MINE);
-				return;
-			}
-		}
-		
-		// Then build tower
-		if (Site.nbOfFriendlyTowers < 5) {
-			site = Algorithm.getClosestSite(friendlyQueen, 
-				Algorithm.isEmpty().and(Algorithm.withMaxTranche(2)));
-			if (site != null) {
-				friendlyQueen.build(site.siteId, Structure.TOWER);
-				return;
-			}
-		}
-		
-		// Then move
-		site = Algorithm.getClosestSite(friendlyQueen, Algorithm.isEmpty());
-		friendlyQueen.move(Queen.originX, Game.maxHigh / 2);
+		Site site = 
+				Action.evolveMine.apply(1, 3)
+				.orElseGet
+				(() -> Action.evolveTower.apply(1, 3, Game.towerNotMaxedAggressive)
+				.orElseGet
+				(() -> Action.buildMine.apply(1, 2, 2, false)
+				.orElseGet
+				(() -> Action.buildTower.apply(2, 2, 1, false)
+				.orElseGet
+				(() -> Action.buildBarrack.apply(2, 3, 1)
+				.orElseGet
+				(() -> Action.restoreTower.apply(1, 2, Game.towerInDangerAggressive, true)
+				.orElseGet
+				(() -> Action.buildMine.apply(1, 2, 4, false)
+				.orElseGet
+				(() -> Action.buildTower.apply(1, 3, 4, true)
+				.orElseGet
+				(() -> Action.moveToOriginCenter.get()
+				.orElseGet(null)
+				))))))));
 	    
-	}
-	
-	static void playClassicStep1() {
-		
-		Site site = null;
-				
-		// Evolve all mines
-		site = Algorithm.getClosestSite(friendlyQueen, 
-				Algorithm.isMine()
-				.and(Algorithm.isOwned(friendlyQueen))
-				.and(Algorithm.isTouched(friendlyQueen))
-				.and(Algorithm.isMineNotMaxed()));
-		if (site != null) {
-			friendlyQueen.build(site.siteId, Structure.MINE);
-			return;
-		}
-		
-		// Evolve all towers
-		site = Algorithm.getClosestSite(friendlyQueen, 
-				Algorithm.isTowerNotMaxed(Game.towerNotMaxed)
-				.and(Algorithm.isTouched(friendlyQueen))
-				.and(Algorithm.isOwned(friendlyQueen)));
-		if (site != null) {
-			friendlyQueen.build(site.siteId, Structure.TOWER);
-			return;
-		}
-		
-		// First build two mines
-		if (Site.nbOfFriendlyMines < 2) {
-			site = Algorithm.getClosestSite(friendlyQueen, 
-					Algorithm.isEmpty());
-			if (site != null) {
-				friendlyQueen.build(site.siteId, Structure.MINE);
-				return;
-			}
-		}
-		
-		// Then build a barrack
-		if (Site.nbOfFriendlyKnightBarracks < 1) {
-			site = Algorithm.getClosestSite(friendlyQueen, 
-					Algorithm.isEmpty().
-					and((Algorithm.inTranche(2)).or(Algorithm.inTranche(3))));
-			if (site != null) {
-				if (site.trancheId == 2) {
-					friendlyQueen.build(site.siteId, Structure.TOWER);
-				}
-				else {
-					friendlyQueen.build(site.siteId, Structure.BARRACKS_KNIGHT);
-				}
-				return;
-			}
-		}
-		
-		// Then restore tower
-		site = Algorithm.getClosestSite(friendlyQueen, 
-				Algorithm.isTowerInDanger(Game.towerInDanger)
-				.and(Algorithm.isOwned(friendlyQueen))
-				.and(Algorithm.withMaxTranche(2)));
-		if (site != null) {
-			friendlyQueen.build(site.siteId, Structure.TOWER);
-			return;
-		}
-		
-		// Then build tower
-		if (Site.nbOfFriendlyTowers < 5) {
-			site = Algorithm.getClosestSite(friendlyQueen, 
-				Algorithm.isEmpty().and(Algorithm.withMaxTranche(3)));
-			if (site != null) {
-				friendlyQueen.build(site.siteId, Structure.TOWER);
-				return;
-			}
-		}
-		
-		// Then continue to mine
-		if (Site.nbOfFriendlyMines < 5) {
-			site = Algorithm.getClosestSite(friendlyQueen, 
-					Algorithm.isEmpty()
-					.and(Algorithm.withMaxTranche(2)));
-			if (site != null) {
-				friendlyQueen.build(site.siteId, Structure.MINE);
-				return;
-			}
-		}
-		
-		// Then move
-		site = Algorithm.getClosestSite(friendlyQueen, Algorithm.isEmpty());
-		friendlyQueen.move(Queen.originX, Game.maxHigh / 2);
-		
 	}
 	
 	static void playClassicStep2() {
@@ -443,17 +307,39 @@ class Game {
 		}
 	}
 	
-	static void playTest1() {
+	static void playClassicStep1() {
 	
-		Site site = Action.buildTower.apply(3, 3)
-			.orElseGet(() -> Action.buildMine.apply(3, 3).orElseGet(null));
+		Site site = 
+				Action.evolveMine.apply(1, 3)
+				.orElseGet
+				(() -> Action.evolveTower.apply(1, 3, Game.towerNotMaxed)
+				.orElseGet
+				(() -> Action.buildMine.apply(1, 2, 2, false)
+				.orElseGet
+				(() -> Action.buildTower.apply(2, 3, 1, false)
+				.orElseGet
+				(() -> Action.buildBarrack.apply(3, 3, 1)
+				.orElseGet
+				(() -> Action.restoreTower.apply(2, 2, Game.towerInDanger, true)
+				.orElseGet
+				(() -> Action.restoreTower.apply(1, 1, Game.towerInDanger, false)
+				.orElseGet
+				(() -> Action.buildTower.apply(1, 3, 5, false)
+				.orElseGet
+				(() -> Action.buildMine.apply(1, 2, 5, false)
+				.orElseGet
+				(() -> Action.buildMine.apply(3, 4, 5, true)
+				.orElseGet
+				(() -> Action.moveToOriginCenter.get()
+				.orElseGet(null)
+				))))))))));
 	}
 	
 	// Starter classique
 	static void playClassic() {
 		
 		//playClassicStep1();
-		playTest1();
+		playClassicStep1();
 		playClassicStep2();
 	}
 	
@@ -471,59 +357,131 @@ class Game {
 
 class Action {
 	
-	static BiFunction<Integer, Integer, Optional<Site>> buildTower = 
-			(maxTower, maxTranche) -> {
+	static QuadriFunction<Integer, Integer, Integer, Boolean, Optional<Site>> buildTower = 
+			(minTranche, maxTranche, maxTower, safeMode) -> {
 				Site site = null;
 				if (Site.nbOfFriendlyTowers < maxTower) {
-					site = Algorithm.getClosestSite(Game.friendlyQueen, 
-							Algorithm.isEmpty().and(Algorithm.withMaxTranche(maxTranche)));
+					site = Algorithm.getClosestSite( 
+							Algorithm.isEmpty()
+							.and(Algorithm.isSafe(safeMode))
+							.and(Algorithm.withMinTranche(minTranche))
+							.and(Algorithm.withMaxTranche(maxTranche)));
 					if (site != null) { Game.friendlyQueen.build(site.siteId, Structure.TOWER); }
 				}
 				return Optional.ofNullable(site);
 			};
 			
-	static BiFunction<Integer, Integer, Optional<Site>> buildMine = 
-			(maxMine, maxTranche) -> {
+	static QuadriFunction<Integer, Integer, Integer, Boolean, Optional<Site>> buildMine = 
+			(minTranche, maxTranche, maxMine, safeMode) -> {
 				Site site = null;
 				if (Site.nbOfFriendlyMines < maxMine) {
-					site = Algorithm.getClosestSite(Game.friendlyQueen, 
-							Algorithm.isEmpty().and(Algorithm.withMaxTranche(maxTranche)));
+					site = Algorithm.getClosestSite(
+							Algorithm.isEmpty()
+							.and(Algorithm.isSafe(safeMode))
+							.and(Algorithm.withMinTranche(minTranche))
+							.and(Algorithm.withMaxTranche(maxTranche)));
 					if (site != null) { Game.friendlyQueen.build(site.siteId, Structure.MINE); }
 				}
 				return Optional.ofNullable(site);
 			};			
+			
+	static TriFunction<Integer, Integer, Integer, Optional<Site>> buildBarrack = 
+			(minTranche, maxTranche, maxBarrack) -> {
+				Site site = null;
+				if (Site.nbOfFriendlyKnightBarracks < maxBarrack) {
+					site = Algorithm.getClosestSite(
+							Algorithm.isEmpty()
+							.and(Algorithm.withMinTranche(minTranche))
+							.and(Algorithm.withMaxTranche(maxTranche)));
+					if (site != null) { Game.friendlyQueen.build(site.siteId, Structure.BARRACKS_KNIGHT); }
+				}
+				return Optional.ofNullable(site);
+			};
+					
+	static BiFunction<Integer, Integer, Optional<Site>> evolveMine = 
+			(minTranche, maxTranche) -> {
+				Site site = Algorithm.getClosestSite(
+						Algorithm.isMine()
+						.and(Algorithm.withMinTranche(minTranche))
+						.and(Algorithm.withMaxTranche(maxTranche))
+						.and(Algorithm.isOwned())
+						.and(Algorithm.isTouched())
+						.and(Algorithm.isMineNotMaxed()));
+				if (site != null) { Game.friendlyQueen.build(site.siteId, Structure.MINE); }
+				return Optional.ofNullable(site);
+			};
+			
+	static TriFunction<Integer, Integer, Integer, Optional<Site>> evolveTower = 
+			(minTranche, maxTranche, towerNotMaxed) -> {
+				Site site = Algorithm.getClosestSite(
+					Algorithm.isTowerNotMaxed(towerNotMaxed)
+					.and(Algorithm.withMinTranche(minTranche))
+					.and(Algorithm.withMaxTranche(maxTranche))
+					.and(Algorithm.isTouched())
+					.and(Algorithm.isOwned()));
+				if (site != null) { Game.friendlyQueen.build(site.siteId, Structure.TOWER); }
+				return Optional.ofNullable(site);
+			};	
+	
+	static QuadriFunction<Integer, Integer, Integer, Boolean, Optional<Site>> restoreTower = 
+			(minTranche, maxTranche, towerNotMaxed, safeMode) -> {
+				Site site = Algorithm.getClosestSite(
+					Algorithm.isTowerNotMaxed(towerNotMaxed)
+					.and(Algorithm.isSafe(safeMode))
+					.and(Algorithm.withMinTranche(minTranche))
+					.and(Algorithm.withMaxTranche(maxTranche))
+					.and(Algorithm.isOwned()));
+				if (site != null) { Game.friendlyQueen.build(site.siteId, Structure.TOWER); }
+				return Optional.ofNullable(site);
+			};	
+
+	static Supplier<Optional<Site>> moveToOriginCenter =
+			() -> {
+				Site site = Algorithm.getClosestSite(Algorithm.alwaysTrue());
+				Game.friendlyQueen.move(Queen.originX, Game.maxHigh / 2);
+				return Optional.ofNullable(site);
+			};
+}
+
+
+@FunctionalInterface
+interface TriFunction<T, U, V, R> {
+    public R apply(T t, U u, V v);
 }
 
 @FunctionalInterface
-interface MultiFunction<T, U, V, W, R> {
+interface QuadriFunction<T, U, V, W, R> {
     public R apply(T t, U u, V v, W w);
 }
 
 class Algorithm {
 	
-	static Site getClosestSite(Queen queen, Predicate<Site> predicate) {
+	static Site getClosestSite(GameObject obj, Predicate<Site> predicate) {
 		
 		Optional<Site> closestSite = Game.sites.values().stream()
 			.filter(predicate)
-			.min(Comparator.comparing(p -> getDistance.apply(p, queen)));
+			.min(Comparator.comparing(p -> getDistance.apply(p, obj)));
 		
 		return closestSite.orElse(null);
 	}
 	
+	static Site getClosestSite(Predicate<Site> predicate) {
+		return getClosestSite(Game.friendlyQueen, predicate);
+	}
 	
-	static Site getFarestSite(Queen queen, Predicate<Site> predicate) {
+	static Site getFarestSite(GameObject obj, Predicate<Site> predicate) {
 		
 		Optional<Site> farestSite = Game.sites.values().stream()
 			.filter(predicate)
-			.max(Comparator.comparing(p -> getDistance.apply(p, queen)));
+			.max(Comparator.comparing(p -> getDistance.apply(p, obj)));
 		
 		return farestSite.orElse(null);
 	}
 	
-	static Double getClosestEnemyKnightDistance(Queen queen) {
+	static Double getClosestEnemyKnightDistance(GameObject obj) {
 		
 		Optional<Double> closestTroopDistance = Game.enemyKnight.stream()
-				.map(p -> getDistance.apply(p, queen))
+				.map(p -> getDistance.apply(p, obj))
 				.min(Comparator.naturalOrder());
 		
 		return closestTroopDistance.orElse(null);
@@ -540,6 +498,10 @@ class Algorithm {
 		return p -> Structure.NO_STRUCTURE.equals(p.structureType) && !p.isDestroyed;
 	}
 	
+	static Predicate<Site> alwaysTrue() {
+		return p -> true;
+	}
+	
 	static Predicate<Site> inTranche(int trancheId) {
 		return p -> p.trancheId == trancheId;
 	}
@@ -548,10 +510,10 @@ class Algorithm {
 		return p -> p.trancheId <= trancheId;
 	}
 	
-	static Predicate<Site> isTowerInDanger(int towerInDanger) {
-		return p -> (Structure.TOWER.equals(p.structureType) && p.towerHealth < towerInDanger);
+	static Predicate<Site> withMinTranche(int trancheId) {
+		return p -> p.trancheId >= trancheId;
 	}
-	
+		
 	static Predicate<Site> isTowerNotMaxed(int towerNotMaxed) {
 		return p -> (Structure.TOWER.equals(p.structureType) && p.towerHealth < towerNotMaxed);
 	}
@@ -580,12 +542,33 @@ class Algorithm {
 		return p -> p.role.equals(queen.role);
 	}
 	
+	static Predicate<Site> isOwned() {
+		return isOwned(Game.friendlyQueen);
+	}
+	
 	static Predicate<Site> isTouched(Queen queen) {
 		return p -> p.siteId == queen.touchedSite;
 	}
 	
+	static Predicate<Site> isTouched() {
+		return isTouched(Game.friendlyQueen);
+	}
+	
 	static Predicate<Site> isMineNotMaxed() {
 		return p -> p.mineMaxIncomeRate != p.mineIncomeRate;
+	}
+	
+	static Predicate<Site> isSafe(Boolean safeMode) {
+		return p -> { 
+			/*Double d = getClosestEnemyKnightDistance(p);
+			if (safeMode && d != null && d < Game.safeDistance) {
+				return false;
+			}*/
+			for (Knight knight:Game.enemyKnight) {
+				if (knight.trancheId >= 3) { return false; }
+			}
+			return true;
+		};
 	}
 }
 
@@ -705,8 +688,16 @@ class Queen extends Unit {
 }
 
 class Knight extends Unit {
+	int trancheId;
 	Knight(Role role, int x, int y, int health) {
 		super(role, x, y, health);
+	}
+	Knight(Role role, int x, int y, int health, int trancheId) {
+		super(role, x, y, health);
+		this.trancheId = trancheId;
+	}
+	void inverseTranche() {
+		this.trancheId = (Game.nbTranches + 1) - trancheId;
 	}
 }
 
